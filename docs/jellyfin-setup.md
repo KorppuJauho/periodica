@@ -8,8 +8,18 @@ Periodica writes files in the layout Jellyfin reads for books. This was checked 
 
 ## Which Jellyfin version?
 
-- **Jellyfin 12 or newer (recommended):** OPF metadata and local covers are built in. The old *Bookshelf* plugin is deprecated in Jellyfin 12, and its online providers are now separate *Google Books* and *ComicVine* plugins. They have nothing to offer a newspaper library; for comics or books, install them if you want extra metadata.
-- **Jellyfin 10.11:** install the **Bookshelf** plugin (Dashboard → Plugins → Catalog → *Bookshelf*) and restart Jellyfin. Uninstall it before upgrading to Jellyfin 12, as the Jellyfin 12 release notes advise for repository plugins.
+**Jellyfin 12 or newer.** That is the only version Periodica has been tried on: CI runs against Jellyfin 12.0
+and 12.1, and the maintainer runs 12.x. OPF metadata and local covers are built in there, so nothing needs
+installing.
+
+**Older versions are untested.** They may work — a 10.x Jellyfin needs the **Bookshelf** plugin (Dashboard →
+Plugins → Catalog → *Bookshelf*) for OPF metadata, and its notes below are written from the plugin's
+documentation, not from a real test. There is no guarantee, and problems on 10.x are not something this
+project chases. Upgrade to 12 if you can; uninstall Bookshelf before you do, as the Jellyfin 12 release notes
+advise for repository plugins.
+
+In Jellyfin 12 the old Bookshelf online providers are separate *Google Books* and *ComicVine* plugins. They
+have nothing to offer a newspaper library; for comics or books, install them if you want extra metadata.
 
 ## Steps
 
@@ -18,14 +28,14 @@ Periodica writes files in the layout Jellyfin reads for books. This was checked 
 3. **Add a library**: Dashboard → Libraries → Add Media Library
    - Content type: **Books**
    - Folder: `/media/books/news`, i.e. the destination folder as Jellyfin sees it
-   - **Metadata downloaders / image fetchers**: for a newspaper library leave all online providers off (Jellyfin 12 has none unless you install the Google Books or ComicVine plugins; on 10.11 untick them) — they find nothing for daily issues. For comics or books, turn on whichever ones you want. Local `metadata.opf`, `cover.jpg` and `folder.jpg` are used either way; Jellyfin prefers local files, so online data only fills what is missing.
+   - **Metadata downloaders / image fetchers**: for a newspaper library leave all online providers off (Jellyfin 12 has none unless you install the Google Books or ComicVine plugins; on older versions untick them) — they find nothing for daily issues. For comics or books, turn on whichever ones you want. Local `metadata.opf`, `cover.jpg` and `folder.jpg` are used either way; Jellyfin prefers local files, so online data only fills what is missing.
    - *Real time monitoring* is optional; Periodica triggers a scan of this library through the API.
 4. Create an API key in Jellyfin (Dashboard → API Keys) and enter it under **Periodica → Settings → Jellyfin**. Press **Test** and choose this library under *Library to scan*.
 
 ## Troubleshooting
 
 - **Covers show "?"**: open the newspaper in Periodica and check the *Cover* column. If it says `failed`, the PDF could not be rendered; use **Re-render cover** after the download is fixed. Then run *Refresh metadata → Replace all images* on the item in Jellyfin.
-- **Titles look like file names**: on Jellyfin 10.11 the Bookshelf plugin is missing, or the *Open Packaging Format* metadata reader is disabled for the library.
+- **Titles look like file names**: the *Open Packaging Format* metadata reader is disabled for the library — or, on an older Jellyfin, the Bookshelf plugin is missing.
 - **The library stays empty or keeps deleted issues**: Jellyfin's log says *"Library folder … is inaccessible or empty, skipping"*. Check that the folder is mounted in Jellyfin's container and contains `.periodica-library`; Periodica recreates it on startup and every scan.
 - **An issue shows up twice**: the destination folder must not be inside another Jellyfin library that also scans it.
 - **Sort names look odd in the API**, e.g. `cotenord gazette 0020260915`: that's Jellyfin 12's normal sort-name cleaning; the order in the library is correct.
