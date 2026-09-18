@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Publications{% endblock %}
+{% block content %}
+<header class="page-head"><h1>Publications</h1></header>
+{% include "_library_filter.html" %}
+{% if not papers %}
+<div class="card"><p class="muted">No publications detected yet. They appear here after a scan finds issues{% if settings.uses_qbit %} in a library's qBittorrent category{% endif %}.</p></div>
+{% else %}
+{% for group in groups if group.papers %}
+<section class="pub-group">
+  <h2>{{ group.title }} <span class="muted small">{{ group.papers | length }}</span></h2>
+  {% if group.note %}<p class="muted small">{{ group.note }}</p>{% endif %}
+  <div class="posters">
+    {% for p in group.papers %}
+    {% set st = stats.get((p.library_id, p.name)) %}
+    <a class="poster {{ 'disabled' if not p.enabled }}" href="/papers/{{ p.library_id }}/{{ p.name | urlencode }}">
+      {% if st and st.latest_id %}
+      <img src="/issues/{{ st.latest_id }}/cover" alt="" loading="lazy">
+      {% else %}
+      <div class="noimg">{{ p.label[:2] }}</div>
+      {% endif %}
+      <div class="poster-body">
+        <strong>{{ p.label }}</strong>
+        <span class="muted small">{{ st.count if st else 0 }} issues{% if st %} · latest {{ st.latest }}{% endif %}</span>
+        <span class="small">
+          {% if libraries | length > 1 and not selected_library %}<span class="badge">{{ library_names.get(p.library_id, '?') }}</span>{% endif %}
+          {% if not p.enabled %}<span class="badge">disabled</span>{% endif %}
+          {% if group.key == 'undecided' %}<span class="badge bad">needs a choice</span>{% endif %}
+          {% if p.retention_days %}<span class="badge">keep {{ p.retention_days }} d</span>{% endif %}
+        </span>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endfor %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,41 @@
+# Periodica — see README.md. Works on any Docker host: NAS, mini PC, VM or Raspberry Pi.
+# Copy .env.example to .env and set PUID/PGID to the same user qBittorrent runs as.
+services:
+  periodica:
+    # IMAGE_TAG: "latest"/"stable" = newest release, "1.0" = newest 1.0.x, "1.0.0" = exact release,
+    # "dev" = development build for testing (see README → Releases). Only run ONE Periodica at a time.
+    image: ghcr.io/korppujauho/periodica:${IMAGE_TAG:-latest}
+    # Or build locally from this repository instead of pulling:
+    # build: .
+    container_name: periodica
+    restart: unless-stopped
+    user: "${PUID:?set PUID in .env}:${PGID:?set PGID in .env}"
+    environment:
+      TZ: ${TZ:-Etc/UTC}
+      DATA_ROOT: /data
+      CONFIG_DIR: /config
+      # SECURE_COOKIES: "true"   # only when served through an HTTPS reverse proxy
+      # OFFLINE_MODE=true in .env (or the stack's variables): no qBittorrent, Jellyfin or scan API (README)
+      OFFLINE_MODE: ${OFFLINE_MODE:-false}
+    volumes:
+      # DATA_PATH: the folder that contains BOTH torrents/ and media/ (one mount is required for hardlinks).
+      - ${DATA_PATH:?set DATA_PATH, e.g. /srv/data}:/data
+      # CONFIG_PATH: persistent folder for the database (owned by PUID:PGID).
+      - ${CONFIG_PATH:-./config}:/config
+    ports:
+      # Bind to the server's LAN IP to avoid exposing the UI on other interfaces (e.g. BIND_IP=192.168.1.10).
+      - "${BIND_IP:-0.0.0.0}:${PORT:-8765}:8765"
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 1g
+    pids_limit: 128
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"

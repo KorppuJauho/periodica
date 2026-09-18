@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Confirm changes{% endblock %}
+{% block content %}
+<header class="page-head"><h1>Confirm changes</h1></header>
+<section class="card">
+  <p>These settings decide which files this app links and may delete, so here is a dry run with the new values first.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Setting</th><th>Current</th><th>New</th></tr></thead>
+    <tbody>{% for label, old, new in changes %}<tr><td>{{ label }}</td><td><code>{{ old }}</code></td><td><code>{{ new }}</code></td></tr>{% endfor %}</tbody>
+  </table>
+  </div>
+
+  <h2>Dry run with new settings</h2>
+  {% if preview.error %}
+    <div class="alert error"><strong>The scan would fail:</strong> {{ preview.error }}</div>
+  {% else %}
+    <dl class="kv">
+      <dt>{{ 'Downloads in the source folder' if folder_mode else 'Torrents in category' }}</dt><dd>{{ preview.torrents }}</dd>
+      <dt>Issues that would be linked</dt><dd>{{ preview.would_link }}</dd>
+      <dt>Already in library</dt><dd>{{ preview.already_linked }}</dd>
+      <dt>Unmatched files</dt><dd>{{ preview.unmatched }}</dd>
+      <dt>Skipped (disabled / expired)</dt><dd>{{ preview.skipped_disabled }} / {{ preview.skipped_expired }}</dd>
+    </dl>
+    {% if preview.messages %}<details><summary>Messages</summary><ul>{% for m in preview.messages %}<li>{{ m }}</li>{% endfor %}</ul></details>{% endif %}
+  {% endif %}
+
+  {% if category_changed %}<div class="alert warn">The download client, category or folders change: pending deletions {{ 'of this library ' if confirm_action else '' }}will be cancelled.</div>{% endif %}
+  {% if disarms %}<div class="alert warn">Automatic delete will be disarmed until you review and arm it again.</div>{% endif %}
+
+  <form method="post" action="{{ confirm_action or '/settings-confirm' }}" class="row">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="token" value="{{ token }}">
+    <button class="primary" type="submit" name="action" value="confirm">Apply changes</button>
+    <button type="submit" name="action" value="cancel">Discard</button>
+  </form>
+</section>
+{% endblock %}

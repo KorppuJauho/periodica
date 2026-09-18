@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Add library' if new else library.name }}{% endblock %}
+{% block content %}
+<header class="page-head">
+  <h1><a href="/settings/libraries" class="muted">Libraries</a> / {{ 'Add library' if new else library.name }}</h1>
+</header>
+
+{% if errors %}
+<div class="alert error"><ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul></div>
+{% endif %}
+{% if problems %}
+<div class="alert warn"><strong>This library is not scanned until this is fixed:</strong>
+  <ul>{% for p in problems %}<li>{{ p }}</li>{% endfor %}</ul></div>
+{% endif %}
+
+<form method="post" action="{{ '/settings/libraries' if new else '/settings/libraries/' ~ library.id }}" class="form-grid wide"
+      id="library-form" data-library-wizard="{{ 'new' if new else 'edit' }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="library_id" value="{{ library.id if not new else 0 }}">
+  {% if new %}
+  <p class="muted">Fill in the steps from top to bottom. Periodica suggests values from qBittorrent and Jellyfin as you
+    go, and checks them; it never changes anything there. Nothing is saved until you press <strong>Create library</strong>.</p>
+  {% endif %}
+
+  <section class="card step">
+    <h2><span class="step-no">1</span> Name</h2>
+    <label>Library name <input name="name" value="{{ library.name if not new else '' }}" placeholder="e.g. Magazines" required maxlength="60" data-wizard-field>
+      <small>Shown in Periodica only. {% if new %}It also suggests the category and the destination folder.{% endif %}</small></label>
+  </section>
+
+  <section class="card step">
+    <h2><span class="step-no">2</span> {{ 'qBittorrent category' if settings.uses_qbit else 'Category (for finished-download calls)' }}</h2>
+    <label>Category <input name="category" value="{{ library.category }}" list="category-options" maxlength="100" {{ 'required' if settings.uses_qbit }} data-wizard-field>
+      <datalist id="category-options"></datalist>
+      <small>{% if settings.uses_qbit %}Exactly as in qBittorrent. Only torrents in this category are ever linked into — or
+        deleted from — this library.{% else %}Optional in folder mode: a finished-download call must name it to reach this
+        library.{% endif %}</small></label>
+    <output class="wizard-hint" id="category-hint"></output>
+  </section>
+
+  <section class="card step">
+    <h2><span class="step-no">3</span> Folders</h2>
+    <label>Source folder (downloads) <input name="source_dir" value="{{ '' if blank_folders else library.source_dir }}" required data-wizard-field>
+      <small>Where {{ "this category's downloads" if settings.uses_qbit else "this library's downloads" }} are, as seen inside this
+        container (under <code>{{ data_root }}</code>). Read only — Periodica never writes here.
+        {% if settings.uses_qbit %}Suggested from the category's save path in qBittorrent.{% else %}Everything directly
+        inside it counts as a download, so it must hold nothing else.{% endif %}</small></label>
+    <label>Destination folder (Jellyfin library) <input name="dest_dir" value="{{ '' if blank_folders else library.dest_dir }}" required data-wizard-field>
+      <small>Must be on the same filesystem as the source, and not inside any other library's folders.</small></label>
+    <ul class="checks" id="library-checks"></ul>
+  </section>
+
+  <section class="card step">
+    <h2><span class="step-no">4</span> Jellyfin library</h2>
+    {% if settings.jellyfin_active %}
+    <label>Library to scan
+      <select name="jellyfin_library_id" id="jellyfin-library">
+        <option value="">All libraries (slow on large servers)</option>
+        {% if library.jellyfin_library_id %}<option value="{{ library.jellyfin_library_id }}" selected>{{ library.jellyfin_library_name or library.jellyfin_library_id }}</option>{% endif %}
+      </select>
+      <input type="hidden" name="jellyfin_library_name" id="jellyfin-library-name" value="{{ library.jellyfin_library_name }}">
+      <small>Only this Jellyfin library is scanned when this library changes.</small></label>
+    <output class="wizard-hint" id="jellyfin-hint"></output>
+    <div class="row"><button type="button" data-wizard-reload>Reload from qBittorrent and Jellyfin</button>
+      {% if not new %}<button type="submit" formaction="/settings/libraries/{{ library.id }}/jellyfin-scan" formnovalidate>Scan this library in Jellyfin now</button>{% endif %}</div>
+    {% else %}
+    <p class="muted">Jellyfin isn't in use (<a href="/settings?section=jellyfin">Settings → Jellyfin</a>), so it finds new
+      issues on its own library scan. Point a Jellyfin <em>Books</em> library at the destination folder.</p>
+    <input type="hidden" name="jellyfin_library_id" value="{{ library.jellyfin_library_id }}">
+    <input type="hidden" name="jellyfin_library_name" value="{{ library.jellyfin_library_name }}">
+    <div class="row"><button type="button" data-wizard-reload>Reload from qBittorrent</button></div>
+    {% endif %}
+  </section>
+
+  <section class="card step">
+    <h2><span class="step-no">5</span> Titles and automatic delete</h2>
+    <label>Title format <input name="title_format" value="{{ library.title_format }}" maxlength="200"
+        data-title-preview="day" data-preview-output="title-preview">
+      <small>For daily issues. Fields: <code>{paper}</code> <code>{day}</code> <code>{month}</code> <code>{year}</code> <code>{dd}</code> <code>{mm}</code> <code>{iso}</code> <code>{weekday}</code></small>
+      <output class="test-result" id="title-preview"></output></label>
+    <label>Title format for monthly issues <input name="monthly_title_format" value="{{ library.monthly_title_format }}" maxlength="200"
+        data-title-preview="month" data-preview-output="title-preview-month">
+      <small>For names like <code>Paper.2026.09</code> when the number is the month. Fields: <code>{paper}</code> <code>{month}</code> <code>{mm}</code> <code>{year}</code> <code>{iso}</code> (2026-09) <code>{month_name}</code></small>
+      <output class="test-result" id="title-preview-month"></output></label>
+    <label>Title format for numbered issues <input name="numbered_title_format" value="{{ library.numbered_title_format }}" maxlength="200"
+        data-title-preview="number" data-preview-output="title-preview-number">
+      <small>For names like <code>Paper.2026.38</code> when the number is the issue. Fields: <code>{paper}</code> <code>{number}</code> <code>{nn}</code> (two digits) <code>{year}</code>.</small>
+      <output class="test-result" id="title-preview-number"></output></label>
+    <label>Metadata language <input name="language" value="{{ library.language }}" pattern="[a-z]{2,3}(-[A-Za-z]{2})?" maxlength="6">
+      <small>ISO code, e.g. <code>fi</code>, <code>sv</code>, <code>en</code>. Also used for weekday and month names.</small></label>
+    <label>Cover width (px) <input type="number" name="cover_width" min="150" max="2000" value="{{ library.cover_width }}"></label>
+    <label id="formats">Format priority <input name="format_priority" value="{{ library.format_priority }}" maxlength="60" placeholder="cbz, pdf, epub, cbr">
+      <small>Issues are linked from <code>pdf</code>, <code>cbz</code>, <code>cbr</code> and <code>epub</code> files.
+        When a download has an issue in several formats, only the first one listed here is linked; the others belong
+        to it and are deleted with the torrent. Issues already in the library keep their file.
+        <code>cbr</code> comes last by default: Periodica cannot read a cover out of a RAR archive.</small></label>
+    <label id="extras">Other files allowed in a download <input name="extra_extensions" value="{{ library.extra_extensions }}" maxlength="250" placeholder="nfo, txt, jpg">
+      <small>File types that may come along with the issues, e.g. <code>nfo, txt, jpg</code> (pdf, cbz, cbr and epub
+        are issues, not extras). They are skipped: never linked, deleted together with the torrent, and they don't
+        keep it from being deleted automatically. Any other file type does.</small></label>
+    <label>Delete after (days) <input type="number" name="retention_days" min="1" max="3650" value="{{ library.retention_days }}">
+      <small>Only used when <a href="/settings?section=retention">automatic delete</a> is on and armed. Publications can
+        override it on their own page.{% if settings.retention_armed %} Changing it disarms automatic delete until you
+        review the preview again.{% endif %}</small></label>
+  </section>
+
+  <section class="card step">
+    <h2><span class="step-no">6</span> {{ 'Review and create' if new else 'Review and save' }}</h2>
+    <p class="muted small">A dry run shows what this library would link with the values above. Nothing is changed.</p>
+    <div class="row">
+      <button class="primary" type="submit">{{ 'Create library' if new else 'Save' }}</button>
+      <button type="button" data-library-preview>Dry run</button>
+      <a class="button" href="/settings/libraries">Cancel</a>
+    </div>
+    <output class="test-result" id="library-preview"></output>
+  </section>
+</form>
+
+{% if not new %}
+<section class="card narrow" id="patterns">
+  <h2>File name patterns</h2>
+  <p class="muted small">Names the built-in rules don't recognise. Add one from the <a href="/unmatched">Unmatched</a>
+    page (<em>Set naming pattern…</em>); they are tried before the built-in rules.</p>
+  {% if not patterns %}<p class="muted">None yet.</p>{% else %}
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Pattern</th><th>Publication</th><th>Kind</th><th class="right"></th></tr></thead>
+    <tbody>
+    {% for row in patterns %}
+    <tr>
+      <td><code>{{ row.pattern }}</code></td>
+      <td>{{ row.paper or '(from the file name)' }}</td>
+      <td class="small">{{ row.kind }}</td>
+      <td class="right">
+        <form method="post" action="/settings/libraries/{{ library.id }}/patterns/{{ row.id }}/delete"
+              data-confirm="Delete the pattern {{ row.pattern }}? Issues already linked stay; new files with this name are no longer recognised.">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+</section>
+
+<section class="card narrow">
+  <h2>Remove this library</h2>
+  <p class="muted small"><strong>Disable</strong> (on the <a href="/settings/libraries">Libraries</a> page) stops scanning and
+    keeps everything. <strong>Delete</strong> forgets the library in Periodica; its files and downloads stay where they
+    are.</p>
+  {% if can_delete %}<a class="button danger" href="/settings/libraries/{{ library.id }}/delete">Delete library…</a>
+  {% else %}<p class="small">The only library cannot be deleted.</p>{% endif %}
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}Deletions{% endblock %}
+{% block content %}
+<header class="page-head"><h1>Deletions</h1></header>
+{% include "_library_filter.html" %}
+
+{% if not settings.uses_qbit %}
+<section class="card">
+  <h2>Deleting needs qBittorrent</h2>
+  <p>Periodica is watching the source folder (Settings → <a href="/settings?section=client">Download client</a>),
+    so <strong>nothing is ever deleted</strong>: not automatically, and not from this page. Remove old downloads
+    yourself; their issues stay in the library until you remove them on the publication page.</p>
+</section>
+
+<section class="card">
+  <h2>Downloads in the source folder ({{ torrents | length }})</h2>
+  {% if not torrents %}<p class="muted">No finished downloads seen during the last scan.</p>{% else %}
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Download</th><th>Size</th><th>Last changed</th><th>In library</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for t in torrents %}
+    <tr>
+      <td>{{ t.name }}</td>
+      <td>{{ t.size | size }}</td>
+      <td class="small">{{ t.completion_on | datetime }}</td>
+      <td>{{ t.linked_issues }} issue(s)</td>
+      <td>{% if t.files_ok %}<span class="badge ok">ok</span>{% else %}<span class="badge bad" title="{{ t.problem or '' }}">{{ t.problem or 'no issues' }}</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+</section>
+{% else %}
+<section class="card">
+  <h2>Automatic delete</h2>
+  {% if not settings.retention_enabled %}
+    <p>Automatic delete is <strong>off</strong>. Nothing is ever deleted. <a href="/settings?section=retention">Configure</a></p>
+  {% else %}
+    <p>Issues older than their library's days
+       ({% for lib in libraries if lib.enabled %}{{ lib.name }}: <strong>{{ lib.retention_days }} d</strong>{{ ', ' if not loop.last }}{% endfor %};
+       a publication can override it) are removed from the library, and torrents in the libraries' categories are removed from qBittorrent <strong>together with their files</strong>
+       once every publication in them has expired. Items wait <strong>{{ settings.grace_hours }} h</strong> in the queue below before they run.</p>
+    {% if not settings.scan_interval_minutes %}
+      <p class="small muted">Scheduled scans are off, so expired items are only queued and deleted when a scan runs (a finished download, <em>Scan now</em>, or container start).</p>
+    {% endif %}
+    {% if settings.retention_armed %}
+      <p><span class="badge ok">armed</span></p>
+      <form method="post" action="/deletions/disarm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit">Disarm (cancel all pending)</button>
+      </form>
+    {% else %}
+      <div class="alert warn">
+        <strong>Not armed.</strong> Review the dry-run preview below. Nothing will be queued or deleted until you arm it.
+      </div>
+    {% endif %}
+  {% endif %}
+</section>
+
+{% if blocked %}
+<section class="card alert-card">
+  <h2>Safety limit reached</h2>
+  <p>{{ blocked.message }}</p>
+  <form method="post" action="/deletions/approve" data-confirm="Approve deleting {{ blocked.torrents }} torrent(s) with their files and {{ blocked.issues }} issue(s)?">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button class="danger" type="submit">Approve this batch</button>
+  </form>
+</section>
+{% endif %}
+
+{% if settings.retention_enabled and preview %}
+<section class="card">
+  <h2>{{ 'Currently expired (preview)' if settings.retention_armed else 'Dry-run preview' }}</h2>
+  <p class="muted small">Computed during the scan {{ preview.at | ago }}.{% if selected_library %} Automatic delete covers all libraries, so this preview does too.{% endif %}</p>
+  <p>Would delete <strong>{{ preview.torrents | length }}</strong> torrent(s) with files ({{ preview.total_size | size }})
+     and remove <strong>{{ preview.issues | length }}</strong> additional issue(s) from the library.</p>
+  {% if preview.upcoming %}
+  <p class="small">Not expired yet ({{ preview.upcoming | length }}). Next to expire:</p>
+  <ul class="small">
+    {% for u in preview.upcoming[:5] %}
+    <li>{{ u.name }}: expires {{ u.expires_at | ago }} ({{ u.expires_at | datetime }}){% if settings.retention_armed and settings.grace_hours %}, then waits {{ settings.grace_hours }} h in the queue{% endif %}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  {% if not settings.retention_armed %}
+  <p class="muted small">You don't need to wait for anything to expire: arming only allows expired items to be queued. Until something expires, nothing happens.</p>
+  {% endif %}
+  {% if preview.torrents %}
+  <details><summary>Torrents</summary>
+    <ul>{% for t in preview.torrents %}<li>{{ t.name }} <span class="muted">({{ t.size | size }}; {{ t.papers | join(', ') }})</span></li>{% endfor %}</ul>
+  </details>
+  {% endif %}
+  {% if preview.issues %}
+  <details><summary>Library issues</summary>
+    <ul>{% for i in preview.issues %}<li>{{ i.label }}</li>{% endfor %}</ul>
+  </details>
+  {% endif %}
+  {% if preview.skipped %}
+  <details><summary>Expired but skipped ({{ preview.skipped | length }})</summary>
+    <ul>{% for s in preview.skipped %}<li>{{ s.label }} — {{ s.reason }}</li>{% endfor %}</ul>
+  </details>
+  {% endif %}
+  {% if not settings.retention_armed %}
+  <form method="post" action="/deletions/arm" class="stack arm-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label class="check"><input type="checkbox" name="confirm" value="yes" required> I reviewed the preview and understand torrents and their files will be deleted</label>
+    <div><button class="danger" type="submit">Arm automatic delete</button></div>
+  </form>
+  {% endif %}
+</section>
+{% elif settings.retention_enabled %}
+<section class="card"><p class="muted">The preview is created during the next scan. <a href="/">Run a scan</a> from the dashboard.</p></section>
+{% endif %}
+
+<section class="card">
+  <h2>Torrents {% if selected_library %}of {{ library_names[selected_library] }}{% else %}in the libraries' categories{% endif %} ({{ torrents | length }})</h2>
+  <p class="muted small">Delete a torrent now: it is removed from qBittorrent together with its downloaded files, and its issues are removed from the library. You'll be asked to confirm.</p>
+  {% if not torrents %}<p class="muted">No torrents seen in the category during the last scan.</p>{% else %}
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Torrent</th><th>Size</th><th>Completed</th><th>In library</th><th>Status</th><th class="right"></th></tr></thead>
+    <tbody>
+    {% for t in torrents %}
+    <tr>
+      <td>{{ t.name }}{% if libraries | length > 1 and not selected_library %}<br><span class="badge">{{ library_names.get(t.library_id, '?') }}</span>{% endif %}</td>
+      <td>{{ t.size | size }}</td>
+      <td class="small">{{ t.completion_on | datetime }}</td>
+      <td>{{ t.linked_issues }} issue(s)</td>
+      <td>{% if t.keep %}<span class="badge">kept</span>{% elif t.files_ok %}<span class="badge ok">ok</span>{% else %}<span class="badge bad" title="{{ t.problem or '' }}">{{ t.problem or 'not deletable' }}</span>{% endif %}</td>
+      <td class="right actions"><a class="button danger" href="/torrents/{{ t.hash }}/delete">Delete…</a></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Pending ({{ pending | length }})</h2>
+  {% if not pending %}<p class="muted">Nothing queued.</p>{% else %}
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Type</th><th>Item</th><th>Size</th><th>Runs</th><th>Note</th><th class="right">Actions</th></tr></thead>
+    <tbody>
+    {% for d in pending %}
+    <tr>
+      <td><span class="badge {{ 'bad' if d.kind == 'torrent' }}">{{ 'torrent + files' if d.kind == 'torrent' else 'library issue' }}</span></td>
+      <td>{{ d.label }}</td>
+      <td>{{ d.size | size if d.kind == 'torrent' else '—' }}</td>
+      <td>{{ d.due_at | ago if d.due_at > now else 'next scan' }}</td>
+      <td class="small">{{ d.detail or '' }}</td>
+      <td class="right actions">
+        <form method="post" action="/deletions/{{ d.id }}/keep"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit" title="{{ 'Take this torrent out of the queue and never delete it automatically; it keeps seeding. Undo under System, Status.' if d.kind == 'torrent' else 'Take this issue out of the queue and never delete it automatically. Undo on its publication page.' }}">Keep</button></form>
+        {% if d.due_at > now %}
+        <form method="post" action="/deletions/{{ d.id }}/now" data-confirm="Delete {{ d.label }} on the next scan?"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="danger" type="submit">Delete now</button></form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+</section>
+
+{% endif %}
+
+<section class="card">
+  <h2>History</h2>
+  {% if not history %}<p class="muted">No history yet.</p>{% else %}
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>When</th><th>Type</th><th>Item</th><th>Result</th><th>Detail</th></tr></thead>
+    <tbody>
+    {% for d in history %}
+    <tr>
+      <td class="small">{{ (d.finished_at or d.created_at) | datetime }}</td>
+      <td>{{ d.kind }}</td>
+      <td>{{ d.label }}</td>
+      <td><span class="badge {{ 'ok' if d.status == 'done' else '' }}">{{ d.status }}</span></td>
+      <td class="small">{{ d.detail or '' }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block auth %}
+<div class="card narrow">
+  <h1>Periodica</h1>
+  {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+  <form method="post" action="/login" class="stack">
+    <label>Username <input name="username" value="{{ username or '' }}" autocomplete="username" required autofocus></label>
+    <label>Password <input type="password" name="password" autocomplete="current-password" required></label>
+    <button class="primary" type="submit">Sign in</button>
+  </form>
+</div>
+{% endblock %}

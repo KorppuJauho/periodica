@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Delete {{ library.name }}{% endblock %}
+{% block content %}
+<header class="page-head">
+  <h1><a href="/settings/libraries" class="muted">Libraries</a> / Delete {{ library.name }}</h1>
+</header>
+<section class="card">
+  {% if only_one %}
+  <div class="alert error">The only library cannot be deleted. Add another library first, or change this one.</div>
+  {% else %}
+  <div class="alert warn">
+    <strong>Periodica forgets this library:</strong> its {{ issues }} issue(s), its publications and their choices
+    (display names, monthly/numbered, keep), and what it knew about the downloads. Pending deletions for it are
+    cancelled.
+  </div>
+  <p><strong>Nothing on disk is touched.</strong> The linked files stay in <code>{{ library.dest_dir }}</code> and the
+    downloads in <code>{{ library.source_dir }}</code>{% if library.category %} (category <code>{{ library.category }}</code>){% endif %}.
+    Remove them yourself if you no longer want them, or add the library again later: the existing files are picked up
+    without linking anything twice.</p>
+  <form method="post" action="/settings/libraries/{{ library.id }}/delete" class="stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label class="check"><input type="checkbox" name="confirm" value="yes" required> Delete library "{{ library.name }}" from Periodica</label>
+    <div class="row">
+      <button class="danger" type="submit">Delete library</button>
+      <a class="button" href="/settings/libraries/{{ library.id }}">Cancel</a>
+    </div>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

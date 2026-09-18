@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Unmatched{% endblock %}
+{% block content %}
+{% set qb = settings.uses_qbit %}
+<header class="page-head"><h1>Unmatched files</h1></header>
+{% include "_library_filter.html" %}
+<section class="card">
+  <p class="muted">{% if qb %}Files in the category that were not linked. A torrent containing any of these is never deleted automatically.{% else %}Files in the source folder that were not linked.{% endif %}</p>
+  {% if items | selectattr('undecided_paper') | list %}
+  <p class="small">For a name like <code>Magazine.2026.01</code> Periodica could not tell whether the number is the month
+    or the issue number (January is where both start). Choose once per magazine; the files are linked on the next scan.</p>
+  {% endif %}
+  {% if not items %}<p>Everything matched.</p>{% else %}
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>{{ 'Torrent' if qb else 'Download' }}</th><th>File</th><th>Reason</th><th>Seen</th><th></th></tr></thead>
+    <tbody>
+    {% for u in items %}
+    <tr><td>{{ u.torrent_name or u.torrent_hash }}{% if libraries | length > 1 and not selected_library %}<br><span class="badge">{{ library_names.get(u.library_id, '?') }}</span>{% endif %}</td><td><code>{{ u.path }}</code></td>
+      <td>{{ u.reason }}
+        {% if u.reason == 'unexpected file type' %}<a class="small" href="/settings/libraries/{{ u.library_id }}#extras">Allow {{ u.path.rsplit('.', 1)[-1] | lower if '.' in u.path else 'this type' }} files in this library</a>{% endif %}
+        {% if u.undecided_paper %}
+        <form method="post" action="/papers/{{ u.library_id }}/{{ u.undecided_paper | urlencode }}/numbering" class="inline-choice">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="back" value="unmatched">
+          <span class="small">{{ u.undecided_paper }} is</span>
+          <button type="submit" name="numbering" value="month">Monthly</button>
+          <button type="submit" name="numbering" value="number">Numbered</button>
+        </form>
+        {% endif %}
+      </td>
+      <td class="small">{{ u.seen_at | ago }}</td>
+      <td class="right actions">
+        {% if u.ignorable %}
+        <form method="get" action="/settings/libraries/{{ u.library_id }}/patterns/new">
+          <input type="hidden" name="torrent" value="{{ u.torrent_hash }}">
+          <input type="hidden" name="path" value="{{ u.path }}">
+          <button type="submit" title="Set a naming pattern: tell Periodica how to read this name, and the file is linked like any other issue.">Fix</button>
+        </form>
+        <form method="post" action="/unmatched/ignore"
+              data-confirm="{% if qb %}Ignore {{ u.path.rsplit('/', 1)[-1] }}? It will no longer keep {{ u.torrent_name or 'its torrent' }} from being deleted automatically — and when that torrent is deleted, this file is deleted with it.{% else %}Ignore {{ u.path.rsplit('/', 1)[-1] }}? It is no longer listed here. Nothing is deleted.{% endif %}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="torrent_hash" value="{{ u.torrent_hash }}">
+          <input type="hidden" name="path" value="{{ u.path }}">
+          <button type="submit" title="{{ 'Stop this file from protecting its torrent.' if qb else 'Stop listing this file.' }} You can undo this below.">Ignore</button>
+        </form>
+        {% endif %}
+      </td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+</section>
+
+{% if ignored %}
+<section class="card">
+  <h2>Ignored files</h2>
+  {% if qb %}<p class="muted small">These no longer protect their torrent: it can be deleted, automatically or by hand, and the file goes with it.
+    An ignore choice is forgotten once its torrent has left the category.</p>
+  {% else %}<p class="muted small">These are no longer listed as unmatched. An ignore choice is forgotten once its download has left the source folder.</p>{% endif %}
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>{{ 'Torrent' if qb else 'Download' }}</th><th>File</th><th>Ignored</th><th></th></tr></thead>
+    <tbody>
+    {% for i in ignored %}
+    <tr><td>{{ i.torrent_name or i.torrent_hash }}</td><td><code>{{ i.path }}</code></td>
+      <td class="small">{{ i.ignored_at | ago }} by {{ i.ignored_by }}</td>
+      <td class="right">
+        <form method="post" action="/unmatched/unignore">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="torrent_hash" value="{{ i.torrent_hash }}">
+          <input type="hidden" name="path" value="{{ i.path }}">
+          <button type="submit" title="{{ 'Let this file protect its torrent from deletion again.' if qb else 'List this file as unmatched again.' }}">Undo</button>
+        </form>
+      </td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

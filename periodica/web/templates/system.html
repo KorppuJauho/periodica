@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}System{% endblock %}
+{% block content %}
+<header class="page-head"><h1>Status</h1></header>
+
+{% include "_connections.html" %}
+
+<section class="card">
+  <h2>Health checks</h2>
+  <div class="table-wrap">
+  <table>
+    <tbody>
+    {% for label, ok, detail in checks %}
+    <tr><td>{{ label }}</td><td><span class="badge {{ 'ok' if ok else 'bad' }}">{{ 'ok' if ok else 'problem' }}</span></td><td class="small"><code>{{ detail }}</code></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% if problems %}<div class="alert warn"><ul>{% for p in problems %}<li>{{ p }}</li>{% endfor %}</ul></div>{% endif %}
+</section>
+
+<section class="card">
+  <h2>About</h2>
+  <dl class="kv">
+    <dt>Version</dt><dd>{{ build }}</dd>
+    <dt>Data root</dt><dd><code>{{ env.data_root }}</code></dd>
+    <dt>Config</dt><dd><code>{{ env.config_dir }}</code></dd>
+    <dt>Secure cookies</dt><dd>{{ 'on' if env.secure_cookies else 'off (set SECURE_COOKIES=true behind HTTPS)' }}</dd>
+  </dl>
+</section>
+
+<section class="card" id="api">
+  <h2>Scan API</h2>
+  {% if settings.offline %}
+  <p class="muted">Off: locked by <code>OFFLINE_MODE</code> in the container's environment. <code>/api/v1/scan</code>
+    answers "not found". The key and your API setting are kept for when the variable is removed.</p>
+  {% elif settings.api_enabled %}
+  <p class="muted">Trigger a scan from a script, e.g. qBittorrent → Options → Downloads → "Run external program on torrent finished":</p>
+  {% if settings.uses_qbit %}
+  <pre class="code">curl -fsS -m 10 -X POST -H "X-Api-Key: &lt;key&gt;" --data-urlencode "category=%L" http://&lt;nas-ip&gt;:8765/api/v1/scan</pre>
+  <p class="muted small"><code>%L</code> is the torrent's category; torrents in other categories are ignored.</p>
+  {% else %}
+  <pre class="code">curl -fsS -m 10 -X POST -H "X-Api-Key: &lt;key&gt;" --data-urlencode "category=%L" --data-urlencode "path=%F" http://&lt;nas-ip&gt;:8765/api/v1/scan</pre>
+  <p class="muted small">Folder mode: the call must name the category
+    {% set cats = libraries | selectattr('enabled') | selectattr('category') | map(attribute='category') | list %}
+    {% if cats %}{% for c in cats %}<code>{{ c }}</code>{{ ', ' if not loop.last }}{% endfor %}{% else %}<strong>(none set yet: calls are refused until a library has one, Settings → Libraries)</strong>{% endif %};
+    other calls are ignored. <code>%F</code> is the finished download's path: that download is linked right away
+    instead of after the settle time. Set the path mapping if the client sees the folder under another path.</p>
+  {% endif %}
+  <p>
+    <button type="button" data-reveal="api-key">Show API key</button>
+    <code id="api-key" hidden>{{ settings.api_key }}</code>
+  </p>
+  <div class="row">
+    <form method="post" action="/system/apikey" data-confirm="Regenerate the API key? Scripts using the old key stop working.">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit">Regenerate key</button>
+    </form>
+    <form method="post" action="/system/api" data-confirm="Turn the scan API off? Scripts calling it get 'not found' until you turn it on again.">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="enabled" value="false">
+      <button type="submit">Turn API off</button>
+    </form>
+  </div>
+  {% else %}
+  <p class="muted">The scan API is <strong>off</strong>: <code>/api/v1/scan</code> answers "not found", and scans run only on
+    the schedule{% if not settings.scan_interval_minutes %} (currently off){% endif %}, on <em>Scan now</em> and when the
+    container starts. The key is kept for when you turn the API back on.</p>
+  <form method="post" action="/system/api">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="enabled" value="true">
+    <button type="submit">Turn API on</button>
+  </form>
+  {% endif %}
+</section>
+
+{% if not settings.uses_qbit %}
+<section class="card">
+  <h2>Watching the source folder</h2>
+  <p class="muted">Every entry in {% for lib in libraries if lib.enabled %}<code>{{ lib.source_dir }}</code>{{ ', ' if not loop.last }}{% endfor %} is a download, linked once nothing in it has
+    changed for {{ settings.settle_minutes }} min. A download that stalls looks finished too, unless its unfinished
+    files are marked: in qBittorrent, turn on <em>Options → Downloads → Append .!qB extension to incomplete files</em>,
+    or keep incomplete downloads in a folder outside the source folder.</p>
+</section>
+{% endif %}
+
+{% if kept %}
+<section class="card">
+  <h2>Kept torrents</h2>
+  <div class="table-wrap">
+  <table><tbody>
+  {% for t in kept %}
+  <tr><td>{{ t.name }}</td><td class="right">
+    <form method="post" action="/torrents/{{ t.hash }}/unkeep"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit">Unkeep</button></form>
+  </td></tr>
+  {% endfor %}
+  </tbody></table>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

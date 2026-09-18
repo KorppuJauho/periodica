@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Setup{% endblock %}
+{% block auth %}
+<div class="card narrow">
+  <h1>Welcome to Periodica</h1>
+  <p class="muted">Create the administrator account. There are no default credentials.</p>
+  {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+  <form method="post" action="/setup" class="stack">
+    <label>Username <input name="username" value="{{ username or '' }}" autocomplete="username" required minlength="3" maxlength="32"></label>
+    <label>Password <input type="password" name="password" autocomplete="new-password" required minlength="10" maxlength="256"></label>
+    <label>Repeat password <input type="password" name="password2" autocomplete="new-password" required minlength="10" maxlength="256"></label>
+    <button class="primary" type="submit">Create account</button>
+  </form>
+</div>
+{% endblock %}

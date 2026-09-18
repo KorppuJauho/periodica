@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Logs{% endblock %}
+{% block content %}
+{% set src = '&source=app' if source else '' %}
+<header class="page-head">
+  <h1>Logs</h1>
+  <nav class="tabs">
+    <a href="/system/logs?q={{ q }}{{ src }}" class="{{ 'active' if not level }}">All</a>
+    <a href="/system/logs?level=info&q={{ q }}{{ src }}" class="{{ 'active' if level == 'info' }}">Info</a>
+    <a href="/system/logs?level=warning&q={{ q }}{{ src }}" class="{{ 'active' if level == 'warning' }}">Warnings</a>
+    <a href="/system/logs?level=error&q={{ q }}{{ src }}" class="{{ 'active' if level == 'error' }}">Errors</a>
+    <a href="/system/logs?level={{ level }}&q={{ q }}{{ '' if source else '&source=app' }}"
+       class="{{ 'active' if source }}">{{ 'Show web requests' if source else 'Periodica only' }}</a>
+  </nav>
+</header>
+
+<section class="card">
+  <div class="log-toolbar">
+    <form method="get" action="/system/logs" class="inline-form">
+      <input type="hidden" name="level" value="{{ level }}">
+      {% if source %}<input type="hidden" name="source" value="app">{% endif %}
+      <input type="search" name="q" value="{{ q }}" placeholder="Search text…" maxlength="100">
+      <button type="submit">Search</button>
+    </form>
+
+    <button type="button" id="log-live" class="toggle" data-live="on"
+            data-url="/system/logs/tail?level={{ level }}&q={{ q }}{{ src }}">Pause</button>
+    <span id="log-live-state" class="muted small">Live</span>
+
+    {% if stored_level == 'debug' %}
+    <span class="badge bad">debug — set in <a href="/settings?section=logging">Settings</a></span>
+    {% else %}
+    <form method="post" action="/system/logs/level{{ '?source=app' if source else '' }}" class="inline-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="detail" value="{{ 'info' if temporary else 'debug' }}">
+      <button type="submit">{{ 'Stop debug logging' if temporary else 'Debug for 30 min' }}</button>
+    </form>
+    {% if temporary %}
+    <span class="badge bad" id="log-debug-left">debug · {{ ((debug_until - now) / 60) | round | int }} min left</span>
+    {% endif %}
+    {% endif %}
+
+    <a class="button-link" href="/system/logs/download?level={{ level }}&q={{ q }}{{ src }}">Download</a>
+    <a class="button-link" href="/settings?section=logging">Log settings</a>
+  </div>
+
+  <p class="muted small">Newest first; new lines appear on their own. Collected since the container started,
+    whether or not this page is open: the newest {{ capacity }} Periodica lines and {{ capacity }} web requests,
+    counted separately so browsing cannot push out an error from an hour ago. A restart clears them
+    (<a href="/activity">Activity</a> keeps 30 days in the database, and <code>docker logs periodica</code>
+    keeps the same lines as long as the container lives). Debug adds one line per file and per API call.</p>
+
+  <p id="log-missed" class="alert warn" hidden></p>
+  {% if not lines %}<p class="muted" id="log-empty">No log lines yet.</p>{% endif %}
+  <div class="table-wrap">
+    <pre class="logs" id="log-lines" data-cursor="{{ cursor }}" data-detail="{{ detail }}" data-temporary="{{ 'true' if temporary else 'false' }}">{% for l in lines %}<span class="lvl-{{ l.level }}">{{ l.ts | datetime }}  {{ "%-7s" | format(l.level.upper()) }} {{ l.logger }}: {{ l.message }}</span>
+{% endfor %}</pre>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Log files</h2>
+  {% if file_size %}
+  <p class="muted small">Written to <code>/config/logs</code>, so they survive a restart or a redeploy.
+    The newest file is the one being written; older ones are rotated copies.</p>
+  {% else %}
+  <p class="muted small">Log files are off (<em>Size of one log file</em> is 0 in
+    <a href="/settings?section=logging">Settings → Logging</a>), so nothing is written to disk and the log above is
+    lost on a restart. <a href="/activity">Activity</a> still keeps 30 days in the database.</p>
+  {% endif %}
+  {% if files %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>File</th><th>Size</th><th>Changed</th><th></th></tr></thead>
+      <tbody>
+        {% for name, size, modified in files %}
+        <tr>
+          <td><code>{{ name }}</code></td>
+          <td>{{ size | size }}</td>
+          <td>{{ modified | datetime }}</td>
+          <td><a href="/system/logs/file?name={{ name | urlencode }}">Download</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

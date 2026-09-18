@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Activity{% endblock %}
+{% block content %}
+<header class="page-head">
+  <h1>Activity</h1>
+  <nav class="tabs">
+    <a href="/activity" class="{{ 'active' if not level }}">All</a>
+    <a href="/activity?level=info" class="{{ 'active' if level == 'info' }}">Info</a>
+    <a href="/activity?level=warning" class="{{ 'active' if level == 'warning' }}">Warnings</a>
+    <a href="/activity?level=error" class="{{ 'active' if level == 'error' }}">Errors</a>
+  </nav>
+</header>
+<section class="card">
+  <ul class="log full">
+    {% for item in items %}
+    <li class="lvl-{{ item.level }}"><time>{{ item.ts | datetime }}</time> <span class="badge">{{ item.level }}</span> {{ item.message }}</li>
+    {% else %}
+    <li class="muted">Nothing logged.</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}

@@ -1,0 +1,59 @@
+[project]
+name = "periodica"
+version = "1.0.0"
+description = "Links newspapers, magazines and comics from qBittorrent into a Jellyfin Books library, with local metadata and covers."
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "jinja2",
+    "python-multipart",
+    "argon2-cffi",
+]
+
+[project.scripts]
+periodica = "periodica.__main__:main"
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["periodica*"]
+
+[tool.setuptools.package-data]
+periodica = ["web/templates/*.html", "web/static/*"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF"]
+ignore = [
+    "S101",  # assert in tests
+    "S603",  # subprocess without shell is intended (pdftoppm)
+    "RUF001", "RUF002", "RUF003",  # non-ASCII characters in strings
+]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Form"]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/*" = ["S106"]
+"tests/*" = ["S105", "S106", "S107", "S108", "S310", "S314", "RUF059"]
+
+[tool.mypy]
+python_version = "3.13"
+ignore_missing_imports = true
+check_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.bandit]
+exclude_dirs = ["tests"]

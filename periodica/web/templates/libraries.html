@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Libraries{% endblock %}
+{% block content %}
+<header class="page-head">
+  <h1>Libraries</h1>
+  <a class="button primary" href="/settings/libraries/new">Add library</a>
+</header>
+
+{% if global_problems %}
+<div class="alert warn"><strong>Not everything can be scanned:</strong>
+  <ul>{% for p in global_problems %}<li>{{ p }}</li>{% endfor %}</ul></div>
+{% endif %}
+
+<section class="card">
+  <p class="muted">Each library is one {{ 'qBittorrent category' if settings.uses_qbit else 'source folder' }} linked into
+    one destination folder, with its own Jellyfin library, title formats and days to keep. The connections to
+    qBittorrent and Jellyfin are shared: <a href="/settings?section=client">Download client</a>,
+    <a href="/settings?section=jellyfin">Jellyfin</a>.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Library</th><th>Category</th><th>Folders</th><th>Jellyfin</th><th>Issues</th><th>Keep</th><th class="right"></th></tr></thead>
+    <tbody>
+    {% for lib in libraries %}
+    <tr class="{{ '' if lib.enabled else 'muted' }}">
+      <td><a href="/settings/libraries/{{ lib.id }}"><strong>{{ lib.name }}</strong></a>
+        {% if not lib.enabled %}<span class="badge">disabled</span>{% elif problems.get(lib.id) %}<span class="badge bad" title="{{ problems[lib.id] | join('; ') }}">needs attention</span>{% endif %}</td>
+      <td>{% if lib.category %}<code>{{ lib.category }}</code>{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td class="small"><code>{{ lib.source_dir }}</code><br>→ <code>{{ lib.dest_dir }}</code></td>
+      <td class="small">{{ lib.jellyfin_library_name or ('all libraries' if settings.jellyfin_active else '—') }}</td>
+      <td>{{ counts.get(lib.id, 0) }}</td>
+      <td>{{ lib.retention_days }} d</td>
+      <td class="right actions">
+        <a class="button" href="/settings/libraries/{{ lib.id }}">Edit</a>
+        <form method="post" action="/settings/libraries/{{ lib.id }}/enabled">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="enabled" value="{{ 'false' if lib.enabled else 'true' }}">
+          <button type="submit" title="{{ 'Stop scanning this library. Nothing is removed; its issues stay in the library and are never deleted automatically while it is disabled.' if lib.enabled else 'Scan this library again.' }}">{{ 'Disable' if lib.enabled else 'Enable' }}</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Scanning</h2>
+  <form method="post" action="/settings/general" class="form-grid">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>Scan interval (minutes) <input type="number" name="scan_interval_minutes" min="0" max="1440" value="{{ settings.scan_interval_minutes }}">
+      <small>All libraries are scanned together. <strong>0 = no scheduled scans:</strong> scans only run when a download
+        finishes (the scan API, see README → automations), on <em>Scan now</em>, and once when the container starts.
+        Automatic delete and the "no new downloads" warning also only run during scans.</small></label>
+    <div><button class="primary" type="submit">Save</button></div>
+  </form>
+</section>
+{% endblock %}
