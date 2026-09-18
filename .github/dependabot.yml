@@ -1,17 +1,21 @@
 version: 2
 updates:
+  # Updates go to develop, like every other change; main only moves through a release PR.
   - package-ecosystem: pip
     directory: /
+    target-branch: develop
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
 
   - package-ecosystem: github-actions
     directory: /
+    target-branch: develop
     schedule:
       interval: weekly
 
   - package-ecosystem: docker
     directory: /
+    target-branch: develop
     schedule:
       interval: weekly
