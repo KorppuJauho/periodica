@@ -1,0 +1,256 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * 1"  # weekly: catch behaviour changes in new Jellyfin/qBittorrent versions
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Install poppler (cover rendering tests)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends poppler-utils
+
+      - name: Install locked dependencies
+        run: |
+          python -m pip install --require-hashes --only-binary=:all: --no-deps -r requirements-dev.txt
+
+      - name: Ruff
+        run: ruff check .
+
+      - name: Mypy
+        run: mypy periodica
+
+      - name: Bandit
+        run: bandit -q -c pyproject.toml -r periodica
+
+      - name: pip-audit (known vulnerabilities in runtime dependencies)
+        run: pip-audit --strict --require-hashes --disable-pip -r requirements.txt
+
+      - name: Tests
+        run: python -m pytest -q -rs -p no:cacheprovider
+
+  integration:
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Start qBittorrent
+        run: docker compose -f tests/integration/compose.yml up -d qbittorrent
+
+      - name: End-to-end test against real qBittorrent
+        run: docker compose -f tests/integration/compose.yml run --rm --build runner
+
+      - name: qBittorrent logs
+        if: failure()
+        run: docker compose -f tests/integration/compose.yml logs --tail 200 qbittorrent
+
+      - name: Clean up
+        if: always()
+        run: docker compose -f tests/integration/compose.yml down -v
+
+  jellyfin:
+    # Heavy (Jellyfin image ~750 MB): release PRs into main, release tags, weekly and on demand.
+    needs: test
+    if: >-
+      (github.event_name == 'pull_request' && github.base_ref == 'main') ||
+      startsWith(github.ref, 'refs/tags/v') ||
+      github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - version: "12.0"
+            image: jellyfin/jellyfin@sha256:baba630419915985442f315f08b0cf46d9f4c8a0cc4bd38e94a6d35751dd5ef5
+          - version: "12.1"
+            image: jellyfin/jellyfin@sha256:78d3ea1207d1322471fcac39a614f004f2ccf7e878f95ab2977d752f07e4dd7e
+    name: jellyfin (${{ matrix.version }})
+    env:
+      JELLYFIN_IMAGE: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Start qBittorrent and Jellyfin ${{ matrix.version }}
+        run: docker compose -f tests/integration/compose.yml --profile jellyfin up -d qbittorrent jellyfin
+
+      - name: End-to-end test against real Jellyfin
+        run: >-
+          docker compose -f tests/integration/compose.yml --profile jellyfin run --rm --build
+          -e NL_IT_JELLYFIN_URL=http://jellyfin:8096 runner
+          python -m pytest -q -rs -p no:cacheprovider tests/integration/test_jellyfin_it.py
+
+      - name: Jellyfin and qBittorrent logs
+        if: failure()
+        run: docker compose -f tests/integration/compose.yml --profile jellyfin logs --tail 150 jellyfin qbittorrent
+
+      - name: Clean up
+        if: always()
+        run: docker compose -f tests/integration/compose.yml --profile jellyfin down -v
+
+  image:
+    needs: [test, integration, jellyfin]
+    # Jellyfin only runs on release events; there it must pass, elsewhere "skipped" is fine.
+    if: >-
+      !cancelled() && needs.test.result == 'success' && needs.integration.result == 'success' &&
+      (needs.jellyfin.result == 'success' ||
+       (needs.jellyfin.result == 'skipped' && !startsWith(github.ref, 'refs/tags/v')))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0  # release checks verify the tag is on main
+
+      - uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003 # v4.4.0
+
+      - name: Run tests inside the runtime image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: test
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build release image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: release
+          build-args: GIT_COMMIT=${{ github.sha }}
+          load: true
+          tags: periodica:ci
+          cache-from: type=gha
+
+      - name: Smoke test (non-root, read-only, no capabilities)
+        run: |
+          mkdir -p "$RUNNER_TEMP/config" "$RUNNER_TEMP/data"
+          sudo chown 10001:10001 "$RUNNER_TEMP/config"
+          docker run -d --name nl --user 10001:10001 --read-only --tmpfs /tmp --cap-drop ALL \
+            --security-opt no-new-privileges:true -p 127.0.0.1:8765:8765 \
+            -v "$RUNNER_TEMP/config:/config" -v "$RUNNER_TEMP/data:/data" periodica:ci
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8765/healthz && break; sleep 1; done
+          curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8765/setup
+          curl -fsS -D - -o /dev/null http://127.0.0.1:8765/setup | grep -i "content-security-policy"
+          test "$(docker inspect -f '{{.Config.User}}' nl)" = "10001:10001"
+          docker exec nl id -u | grep -qx 10001
+          docker logs nl
+          docker rm -f nl
+
+      - name: Vulnerability scan (Grype)
+        uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
+        with:
+          image: periodica:ci
+          fail-build: true
+          severity-cutoff: high
+          only-fixed: true
+          output-format: table
+
+      - name: Release checks (tag must be on main and match the code version)
+        if: startsWith(github.ref, 'refs/tags/v')
+        id: release
+        run: |
+          set -eu
+          version="${GITHUB_REF_NAME#v}"
+          echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "Tag must look like v1.2.3"; exit 1; }
+          code_version=$(python3 -c 'import re,pathlib;print(re.search(r"__version__ = \"([^\"]+)\"", pathlib.Path("periodica/__init__.py").read_text()).group(1))')
+          [ "$version" = "$code_version" ] || { echo "Tag $version != __version__ $code_version"; exit 1; }
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "Release tags must point to a commit on main"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image metadata
+        if: github.event_name == 'push'
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/periodica
+          flavor: |
+            latest=false
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=stable,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/develop' }}
+            type=sha,format=short,prefix=sha-
+
+      - name: Push image
+        if: github.event_name == 'push'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: release
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
+            APP_VERSION=${{ steps.release.outputs.version }}
+          push: true
+          provenance: mode=max
+          sbom: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+
+  release:
+    needs: image
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Create GitHub Release from CHANGELOG
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '$0 == "## [" v "]" {on=1; next} /^## \[/ {on=0} on' CHANGELOG.md > notes.md
+          [ -s notes.md ] || { echo "CHANGELOG.md has no section for $version"; exit 1; }
+          printf '\n**Image:** `ghcr.io/%s/periodica:%s` (also `:%s`, `:stable`, `:latest`)\n' \
+            "${GITHUB_REPOSITORY_OWNER,,}" "$version" "${version%.*}" >> notes.md
+          gh release create "$GITHUB_REF_NAME" --verify-tag --title "Periodica $version" --notes-file notes.md

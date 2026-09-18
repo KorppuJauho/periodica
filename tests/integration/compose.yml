@@ -1,0 +1,111 @@
+# Integration test and local UI test environment: Periodica against a real qBittorrent
+# (no internet or tracker needed). Easiest via scripts/test-local.sh; raw commands:
+#
+#   docker compose -f tests/integration/compose.yml up -d qbittorrent
+#   docker compose -f tests/integration/compose.yml run --rm --build runner
+#   docker compose -f tests/integration/compose.yml down -v
+name: periodica-it
+
+services:
+  init:
+    image: alpine@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce
+    volumes:
+      - data:/data
+      - qbit-config:/config
+      - app-config:/appconfig
+      - jellyfin-config:/jellyfin-config
+      - jellyfin-cache:/jellyfin-cache
+      - ./qBittorrent.conf:/template/qBittorrent.conf:ro
+    command:
+      - sh
+      - -euc
+      - >
+        mkdir -p /data/torrents/books/news /data/torrents/movies /data/media/books /config/qBittorrent &&
+        cp /template/qBittorrent.conf /config/qBittorrent/qBittorrent.conf &&
+        chown -R 10001:10001 /data /config /appconfig /jellyfin-config /jellyfin-cache
+
+  qbittorrent:
+    image: linuxserver/qbittorrent@sha256:2be038f3421f60f62e8e4bf201f66f385b68e4fbc9ed3ab79051069ea22e2650
+    environment:
+      PUID: "10001"
+      PGID: "10001"
+      TZ: Etc/UTC
+      WEBUI_PORT: "8080"
+    volumes:
+      - qbit-config:/config
+      # qBittorrent sees the data under /storage, Periodica under /data: exercises remote path mapping
+      - data:/storage
+    ports:
+      - "127.0.0.1:18080:8080"  # local UI testing only
+    depends_on:
+      init:
+        condition: service_completed_successfully
+
+  runner:
+    build:
+      context: ../..
+      target: integration
+    user: "10001:10001"
+    environment:
+      NL_IT_QBIT_URL: http://qbittorrent:8080
+      NL_IT_QBIT_USER: admin
+      NL_IT_QBIT_PASSWORD: integration-only-password
+      NL_IT_APP_CONFIG: /appconfig
+    volumes:
+      - data:/data
+      - app-config:/appconfig
+    depends_on:
+      - qbittorrent
+
+  # Jellyfin 12 (scripts/test-local.sh jellyfin; CI on release PRs, tags and weekly). Needs no plugins:
+  # Jellyfin 12 reads metadata.opf and local covers natively.
+  jellyfin:
+    profiles: [jellyfin]
+    # JELLYFIN_IMAGE lets CI test several versions (see .github/workflows/ci.yml); default: 12.1
+    image: ${JELLYFIN_IMAGE:-jellyfin/jellyfin@sha256:78d3ea1207d1322471fcac39a614f004f2ccf7e878f95ab2977d752f07e4dd7e}
+    user: "10001:10001"
+    volumes:
+      - jellyfin-config:/config
+      - jellyfin-cache:/cache
+      - data:/srv:ro
+    ports:
+      - "127.0.0.1:18096:8096"  # local testing only
+    depends_on:
+      init:
+        condition: service_completed_successfully
+
+  # Local manual testing (scripts/test-local.sh ui): the real release image with the web UI.
+  app:
+    profiles: [ui]
+    build:
+      context: ../..
+      target: release
+    user: "10001:10001"
+    environment:
+      TZ: Etc/UTC
+      DATA_ROOT: /data
+      CONFIG_DIR: /config
+    volumes:
+      - data:/data
+      - app-config:/config
+    ports:
+      - "127.0.0.1:8765:8765"
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      qbittorrent:
+        condition: service_started
+
+volumes:
+  data:
+  qbit-config:
+  app-config:
+  jellyfin-config:
+  jellyfin-cache:

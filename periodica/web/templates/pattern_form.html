@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Naming pattern{% endblock %}
+{% block content %}
+<header class="page-head">
+  <h1><a href="/unmatched" class="muted">Unmatched</a> / Naming pattern for {{ library.name }}</h1>
+</header>
+
+{% if errors %}
+<div class="alert error"><ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul></div>
+{% endif %}
+
+<form method="post" action="/settings/libraries/{{ library.id }}/patterns" class="form-grid wide" id="pattern-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="torrent" value="{{ torrent }}">
+  <section class="card step">
+    {% if filename %}
+    <p>Teach Periodica to read <code>{{ filename }}</code>. The pattern is written the way the name looks, with
+      placeholders for the parts that change.</p>
+    <input type="hidden" name="filename" value="{{ filename }}">
+    {% endif %}
+    <label>Pattern <input name="pattern" value="{{ pattern }}" required maxlength="120" data-pattern-field
+                          placeholder="DW.{year}.No.{number}">
+      <small>
+        <code>{year}</code> four digits (required) ·
+        <code>{number}</code> an issue number ·
+        <code>{month}</code> a month (a monthly issue) ·
+        <code>{month}</code> + <code>{day}</code> a date (a daily issue) ·
+        <code>{paper}</code> the publication name, read from the file ·
+        <code>{any}</code> text to skip.
+        Dots, spaces, dashes and underscores match each other; letters match in any case.
+      </small></label>
+    <label>Publication <input name="publication" value="{{ publication }}" list="publication-options" maxlength="120" data-pattern-field
+                              placeholder="Duck Weekly">
+      <datalist id="publication-options">{% for name in publications %}<option value="{{ name }}"></option>{% endfor %}</datalist>
+      <small>The name Periodica uses for these issues: their folder, and the title, series and publisher Jellyfin
+        shows. A file called <code>DW.2026.No.38.pdf</code> with the publication <em>Duck Weekly</em> is linked as
+        <em>Duck Weekly 2026 #38</em> in the <em>Duck Weekly</em> folder. Leave it empty only when the pattern uses
+        <code>{paper}</code>.</small></label>
+    <output class="test-result" id="pattern-result"></output>
+    <ul class="small" id="pattern-matches"></ul>
+    <div class="row">
+      <button class="primary" type="submit">Save pattern</button>
+      <a class="button" href="/unmatched">Cancel</a>
+    </div>
+    <p class="muted small">Saving starts a scan. {% if patterns %}This library has {{ patterns | length }} pattern(s);
+      <a href="/settings/libraries/{{ library.id }}#patterns">see them</a>.{% endif %}</p>
+  </section>
+</form>
+{% endblock %}

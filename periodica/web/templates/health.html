@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Library health{% endblock %}
+{% block content %}
+<header class="page-head"><h1>Library health</h1></header>
+{% include "_library_filter.html" %}
+<section class="card">
+  <p class="muted">Every scan checks that the issues in the library are whole: the folder and the issue file are there, the file
+    is still a link to the download (not a copy), and <code>metadata.opf</code> and the cover exist.
+    A damaged issue is <strong>not repaired automatically</strong>: press <strong>Fix</strong> to repair it on the next scan,
+    or <strong>Remove</strong> if it was taken out of the library on purpose.</p>
+  {% if not items %}
+  <p><span class="badge ok">ok</span> All linked issues are whole{% if last_scan %} (checked {{ last_scan.finished | ago }}){% endif %}.</p>
+  {% else %}
+  {% set fixable = items | selectattr('fixable') | list %}
+  {% if fixable %}
+  <form method="post" action="/health/fix" class="row"
+        {% if fixable | selectattr('problem', 'equalto', 'copy') | list %}data-confirm="Fix {{ fixable | length }} issue(s)? For a file that is a copy, the file in the library is deleted and replaced with a link to the download."{% endif %}>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="all" value="1">
+    <input type="hidden" name="library" value="{{ selected_library or '' }}">
+    <button class="primary" type="submit">Fix all ({{ fixable | length }})</button>
+  </form>
+  {% endif %}
+  <div class="table-wrap">
+  <table>
+    <thead><tr>{% if libraries | length > 1 and not selected_library %}<th>Library</th>{% endif %}<th>Issue</th><th>Problem</th><th>Since</th><th class="right">Actions</th></tr></thead>
+    <tbody>
+    {% for p in items %}
+    <tr>
+      {% if libraries | length > 1 and not selected_library %}<td>{{ p.library_name }}</td>{% endif %}
+      <td><a href="/papers/{{ p.library_id }}/{{ p.paper | urlencode }}">{{ p.label }} {{ p.issue_label }}</a></td>
+      <td>{{ p.problem_text }}
+        {% if not p.fixable %}<div class="small muted">The download is gone, so it cannot be linked again.</div>
+        {% elif p.fix_requested %}<div class="small">Fixing on the next scan.</div>{% endif %}</td>
+      <td class="small">{{ p.problem_since | ago }}</td>
+      <td class="right actions">
+        {% if p.fixable and not p.fix_requested %}
+        <form method="post" action="/health/fix"{% if p.problem == 'copy' %} data-confirm="Replace the file of {{ p.label }} {{ p.issue_label }} with a link to the download? The file now in the library is deleted."{% endif %}>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="issue_id" value="{{ p.id }}">
+          <button class="primary" type="submit">Fix</button>
+        </form>
+        {% endif %}
+        <form method="post" action="/issues/{{ p.id }}/remove" data-confirm="Remove {{ p.label }} {{ p.issue_label }} from the library for good? What is left of its folder is deleted; the download is not touched.">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="back" value="health">
+          <button class="danger" type="submit">Remove</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

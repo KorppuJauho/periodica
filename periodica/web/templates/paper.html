@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}{{ paper.label }}{% endblock %}
+{% block content %}
+<header class="page-head"><h1><a href="/papers" class="muted">Publications</a> / {{ paper.label }}{% if show_library and library %} <span class="badge">{{ library.name }}</span>{% endif %}</h1></header>
+
+<section class="card">
+  <h2>Options</h2>
+  <form method="post" action="/papers/{{ paper.library_id }}/{{ paper.name | urlencode }}" class="form-grid">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>Detected name <input value="{{ paper.name }}" disabled></label>
+    <label>Display name <input name="display_name" value="{{ paper.display_name or '' }}" placeholder="{{ paper.name }}" maxlength="120">
+      <small>Used for folder names and titles. Existing issues are moved on the next scan.</small></label>
+    <label>Retention override (days) <input name="retention_days" type="number" min="1" max="3650" value="{{ paper.retention_days or '' }}" placeholder="default {{ library.retention_days if library else settings.retention_days }}">
+      <small>{% if settings.uses_qbit %}A pack torrent is only deleted once every paper in it has expired.{% else %}Not used
+        while Periodica watches the source folder: nothing is deleted without qBittorrent.{% endif %}</small></label>
+    <label class="check"><input type="checkbox" name="enabled" {{ 'checked' if paper.enabled }}> Link new issues of this publication</label>
+    <div><button class="primary" type="submit">Save</button></div>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Monthly or numbered</h2>
+  <p class="muted small">Only matters for file names with a year and a number, such as <code>{{ paper.name | replace(' ', '.') }}.2026.09.pdf</code>:
+    is 09 September, or issue 9? Daily issues are not affected.</p>
+  <dl class="kv">
+    <dt>Counted as</dt>
+    <dd>{% if paper.numbering %}{{ 'monthly' if paper.numbering == 'month' else 'numbered' }} (set by you)
+        {% elif paper.numbering_detected %}{{ 'monthly' if paper.numbering_detected == 'month' else 'numbered' }} (detected)
+        {% else %}not decided yet{% endif %}</dd>
+    {% if paper.numbering_reason and not paper.numbering %}<dt>Why</dt><dd>{{ paper.numbering_reason }}</dd>{% endif %}
+  </dl>
+  <form method="post" action="/papers/{{ paper.library_id }}/{{ paper.name | urlencode }}/numbering" class="form-grid">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>Count issues as
+      <select name="numbering">
+        <option value="" {{ 'selected' if not paper.numbering }}>Detect automatically</option>
+        <option value="month" {{ 'selected' if paper.numbering == 'month' }}>Monthly — the number is the month</option>
+        <option value="number" {{ 'selected' if paper.numbering == 'number' }}>Numbered — the number is the issue</option>
+      </select>
+      <small>Your choice always wins over detection. Issues already in the library are relabelled on the next scan.</small></label>
+    <div><button class="primary" type="submit">Save</button></div>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Issues</h2>
+  {% if not issues %}<p class="muted">No issues yet.</p>{% else %}
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th></th><th>Issue</th><th>Status</th><th>Cover</th><th>Linked</th><th class="right">Actions</th></tr></thead>
+    <tbody>
+    {% for i in issues %}
+      <tr>
+        <td class="thumb">{% if i.status == 'linked' and i.cover_status == 'ok' %}<img src="/issues/{{ i.id }}/cover" alt="" loading="lazy">{% endif %}</td>
+        <td>{{ i.issue_label }} <span class="badge" title="The file linked into the library">{{ i.file_ext[1:] }}</span>{% if i.keep %} <span class="badge">kept</span>{% endif %}</td>
+        <td><span class="badge {{ 'ok' if i.status == 'linked' else ('bad' if i.status == 'error' else '') }}">{{ i.status }}</span>
+          {% if i.problem and i.status == 'linked' %}<span class="badge bad" title="{{ problem_texts.get(i.problem, i.problem) }}">damaged</span>
+          <div class="small bad-text">{{ problem_texts.get(i.problem, i.problem) }}{% if i.fix_requested %} (fixing on the next scan){% endif %}</div>{% endif %}
+          {% if i.error %}<div class="small bad-text">{{ i.error }}</div>{% endif %}</td>
+        <td><span class="badge {{ 'ok' if i.cover_status == 'ok' else ('bad' if i.cover_status == 'failed' else '') }}">{{ i.cover_status }}</span></td>
+        <td class="small">{{ i.linked_at | datetime }}</td>
+        <td class="right actions">
+          {% if i.status == 'linked' %}
+          {% if i.problem and not i.fix_requested %}
+          <form method="post" action="/issues/{{ i.id }}/fix"{% if i.problem == 'copy' %} data-confirm="Replace the file in the library with a link to the download? The file now in the library is deleted."{% endif %}><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="primary" type="submit" title="Repair this issue on the next scan (needs its download).">Fix</button></form>
+          {% endif %}
+          <form method="post" action="/issues/{{ i.id }}/cover"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit" title="Make the cover again on the next scan (page 1 of a PDF, or the cover image in a cbz or epub).">Re-render cover</button></form>
+          <form method="post" action="/issues/{{ i.id }}/keep"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit" {% if not settings.uses_qbit %}disabled title="Keep only matters for automatic delete, which needs qBittorrent."{% else %}title="{{ 'Let automatic delete handle this issue again.' if i.keep else 'Never delete this issue automatically. Its torrent is kept too and keeps seeding, together with everything else in that pack.' }}"{% endif %}>{{ 'Unkeep' if i.keep else 'Keep' }}</button></form>
+          <form method="post" action="/issues/{{ i.id }}/remove" data-confirm="Remove {{ paper.label }} {{ i.issue_label }} from the Jellyfin library? The download is not touched."><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="danger" type="submit">Remove</button></form>
+          {% elif i.status in ('excluded', 'removed', 'error') %}
+          <form method="post" action="/issues/{{ i.id }}/restore"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit">Relink</button></form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p class="muted small">{% if settings.uses_qbit %}<strong>Keep</strong> protects an issue from automatic delete, and with it the whole torrent it came
+    in, which keeps seeding.{% else %}<strong>Keep</strong> is unavailable: automatic delete needs qBittorrent.{% endif %} <strong>Remove</strong> takes an issue out of the Jellyfin library for good; the download is
+    not touched.</p>
+  {% endif %}
+</section>
+{% endblock %}

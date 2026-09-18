@@ -1,0 +1,9 @@
+{% if libraries and libraries | length > 1 %}
+<nav class="library-filter" aria-label="Library">
+  <span class="muted small">Library:</span>
+  <a href="?library=all" class="{{ 'active' if not selected_library }}">All</a>
+  {% for lib in libraries %}
+  <a href="?library={{ lib.id }}" class="{{ 'active' if selected_library == lib.id }}">{{ lib.name }}{% if not lib.enabled %} <span class="muted">(disabled)</span>{% endif %}</a>
+  {% endfor %}
+</nav>
+{% endif %}

@@ -1,0 +1,14 @@
+<section class="card">
+  <h2>Connections</h2>
+  <ul class="connections">
+    {% for c in connections %}
+    <li class="conn conn-{{ c.state }}">
+      <span class="dot" aria-hidden="true"></span>
+      <strong>{{ c.name }}</strong>
+      <span class="conn-summary">{{ c.summary }}{% if c.at %} <span class="muted small">· {{ c.at | ago }}</span>{% endif %}</span>
+      {% if c.detail %}<span class="small muted conn-detail">{{ c.detail }}</span>{% endif %}
+      {% if c.link %}<a class="small" href="{{ c.link }}">{{ 'Settings' if c.link.startswith('/settings') else 'Details' }}</a>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</section>

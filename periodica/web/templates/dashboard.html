@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<header class="page-head">
+  <h1>Dashboard</h1>
+  {% set scan_pending = running or scan_queued %}
+  <form method="post" action="/scan" id="scan-form" data-scan-pending="{{ 'true' if scan_pending else 'false' }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button class="primary" type="submit" {{ 'disabled' if scan_pending }}>{{ 'Scanning…' if scan_pending else 'Scan now' }}</button>
+  </form>
+</header>
+
+{% if problems %}
+<div class="alert error">
+  <strong>Setup needed — the scanner is idle until this is fixed:</strong>
+  <ul>{% for p in problems %}<li>{{ p }}</li>{% endfor %}</ul>
+  {% set ns = namespace(client=false) %}{% for p in problems %}{% if 'qBittorrent' in p %}{% set ns.client = true %}{% endif %}{% endfor %}
+  <a href="/settings?section={{ 'client' if ns.client else 'library' }}">Open settings</a>
+</div>
+{% endif %}
+{% for item in stale %}
+<div class="alert warn"><strong>No new downloads{% if libraries | length > 1 %} in {{ item.library.name }}{% endif %}:</strong>
+  nothing new has finished {% if settings.uses_qbit %}in category <code>{{ item.library.category }}</code>{% else %}in {{ 'its' if libraries | length > 1 else 'the' }} source folder{% endif %}
+  since {{ item.last | datetime }} ({{ item.last | ago }}). {% if settings.uses_qbit %}Check the qBittorrent RSS rule and feed.{% else %}Check whatever fills the folder.{% endif %} <a href="/system">System checks</a></div>
+{% endfor %}
+{% if damaged %}
+<div class="alert warn"><strong>{{ damaged }} issue{{ 's are' if damaged != 1 else ' is' }} damaged in the library</strong>
+  (missing, copied or without metadata or cover). Nothing is repaired until you choose. <a href="/health">Library health</a></div>
+{% endif %}
+{% if blocked %}
+<div class="alert warn"><strong>Automatic delete paused:</strong> {{ blocked.message }} <a href="/deletions">Review</a></div>
+{% endif %}
+
+<section class="tiles">
+  <div class="tile"><span class="num">{{ papers }}</span><span>Publications</span></div>
+  <div class="tile"><span class="num">{{ counts.get('linked', 0) }}</span><span>Issues in library</span></div>
+  <div class="tile {{ 'bad' if counts.get('error', 0) }}"><span class="num">{{ counts.get('error', 0) }}</span><span>Issues with errors</span></div>
+  <div class="tile {{ 'bad' if counts.get('covers_failed', 0) }}"><span class="num">{{ counts.get('covers_failed', 0) }}</span><span>Missing covers</span></div>
+  <div class="tile"><span class="num">{{ pending }}</span><span>Pending deletions</span></div>
+  {% if unmatched %}
+  <a class="tile bad" href="/unmatched"><span class="num">{{ unmatched }}</span><span>Unmatched files</span></a>
+  {% else %}
+  <div class="tile"><span class="num">0</span><span>Unmatched files</span></div>
+  {% endif %}
+</section>
+
+{% include "_connections.html" %}
+
+{% if libraries | length > 1 %}
+<section class="card">
+  <h2>Libraries</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Library</th><th>Publications</th><th>Issues</th><th>Unmatched</th><th>Damaged</th><th>Last download</th></tr></thead>
+    <tbody>
+    {% for lib in libraries %}
+    {% set o = overview.get(lib.id, {}) %}
+    <tr class="{{ '' if lib.enabled else 'muted' }}">
+      <td><a href="/papers?library={{ lib.id }}">{{ lib.name }}</a>{% if not lib.enabled %} <span class="badge">disabled</span>{% endif %}</td>
+      <td>{{ o.papers or 0 }}</td>
+      <td>{{ o.issues or 0 }}</td>
+      <td>{% if o.unmatched %}<a class="bad-text" href="/unmatched?library={{ lib.id }}">{{ o.unmatched }}</a>{% else %}0{% endif %}</td>
+      <td>{% if o.problems %}<a class="badge bad" href="/health?library={{ lib.id }}">{{ o.problems }}</a>{% else %}0{% endif %}</td>
+      <td class="small">{% if o.last_download %}{{ o.last_download | ago }}{% else %}<span class="muted">none yet</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+{% endif %}
+
+<section class="grid2">
+  <div class="card">
+    <h2>Last scan</h2>
+    {% if last_scan %}
+    <dl class="kv">
+      <dt>Finished</dt><dd>{{ last_scan.finished | datetime }} ({{ last_scan.finished | ago }})</dd>
+      <dt>Result</dt><dd>{% if last_scan.error %}<span class="badge bad">error</span> {{ last_scan.error }}{% else %}<span class="badge ok">ok</span>{% endif %}</dd>
+      <dt>{{ 'Torrents in category' if settings.uses_qbit else 'Downloads in the source folder' }}</dt><dd>{{ last_scan.torrents }}</dd>
+      <dt>Last news download</dt><dd>{% if last_download %}{{ last_download | datetime }} ({{ last_download | ago }}){% else %}none seen yet{% endif %}</dd>
+      <dt>Newly linked</dt><dd>{{ last_scan.linked }}</dd>
+      <dt>Covers rendered</dt><dd>{{ last_scan.covers }}{% if last_scan.cover_failures %} ({{ last_scan.cover_failures }} failed){% endif %}</dd>
+      <dt>Unmatched files</dt><dd>{{ last_scan.unmatched }}</dd>
+      {% if settings.uses_qbit %}<dt>Deleted</dt><dd>{{ last_scan.torrents_deleted }} torrents, {{ last_scan.issues_removed }} issues</dd>{% endif %}
+      {% if settings.jellyfin_active %}<dt>Jellyfin scan requested</dt><dd>{{ 'yes' if last_scan.jellyfin_refreshed else 'no' }}</dd>{% endif %}
+    </dl>
+    {% else %}
+    <p class="muted">No scan has run yet.</p>
+    {% endif %}
+    <p class="muted small">{% if settings.scan_interval_minutes %}Scans every {{ settings.scan_interval_minutes }} min{% else %}Scheduled scans off (download-triggered and manual only){% endif %} ·
+      {% if settings.uses_qbit %}{{ 'category' if libraries | length == 1 else 'categories' }}
+      {% for lib in libraries if lib.enabled %}<code>{{ lib.category or '—' }}</code>{{ ', ' if not loop.last }}{% endfor %} ·
+      automatic delete {% if not settings.retention_enabled %}off{% elif settings.retention_armed %}on{% if libraries | length == 1 %} ({{ libraries[0].retention_days }} d){% endif %}{% else %}<strong>not armed</strong>{% endif %}
+      {%- else %}watching the source folder (settle time {{ settings.settle_minutes }} min) · nothing is deleted{% endif %}</p>
+  </div>
+  <div class="card">
+    <h2>Recent activity</h2>
+    <ul class="log">
+      {% for item in recent %}
+      <li class="lvl-{{ item.level }}"><time>{{ item.ts | ago }}</time> {{ item.message }}</li>
+      {% else %}
+      <li class="muted">Nothing yet.</li>
+      {% endfor %}
+    </ul>
+    <a href="/activity">All activity →</a>
+  </div>
+</section>
+{% endblock %}

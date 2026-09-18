@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<header class="page-head">
+  <h1>{{ {'client': 'Download client', 'retention': 'Automatic delete',
+           'jellyfin': 'Jellyfin', 'logging': 'Logging', 'account': 'Account'}.get(section, 'Settings') }}</h1>
+</header>
+
+{% if errors %}
+<div class="alert error"><ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul></div>
+{% endif %}
+{% if problems and section != 'account' %}
+<div class="alert warn"><strong>Scanner idle:</strong><ul>{% for p in problems %}<li>{{ p }}</li>{% endfor %}</ul></div>
+{% endif %}
+
+{% if section == 'client' %}
+<section class="card">
+  <form method="post" action="/settings/client" class="form-grid" id="client-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <fieldset {{ 'disabled' if settings.offline }}>
+      <legend>How downloads are found</legend>
+      {% if settings.offline %}<p class="small">Locked to <strong>watching the source folder</strong> by
+        <code>OFFLINE_MODE</code>. Your saved choice comes back when the variable is removed.</p>{% endif %}
+      <label class="check"><input type="radio" name="download_client" value="qbittorrent" {{ 'checked' if settings.uses_qbit }} data-mode-switch>
+        <span><span><strong>qBittorrent</strong> (recommended)</span>
+        <small>Only torrents in the category below are ever linked or deleted; every other torrent is invisible to
+          this app. qBittorrent says when a download is finished, and automatic delete is available.</small></span></label>
+      <label class="check"><input type="radio" name="download_client" value="none" {{ 'checked' if not settings.uses_qbit }} data-mode-switch>
+        <span><strong>None: watch the source folder</strong>
+        <small>Periodica never contacts a download client. <strong>Everything</strong> directly inside the source
+          folder counts as a download, so the folder must hold nothing else. A download is linked once nothing in it
+          has changed for the settle time below (or right away when a finished-download call names it), and never
+          while it holds partial files (<code>.!qB</code>, <code>.part</code>). Nothing is ever deleted: automatic
+          and manual delete need qBittorrent. Saved qBittorrent settings are kept.</small></span></label>
+    </fieldset>
+
+    <div data-mode="none" {{ 'hidden' if settings.uses_qbit }}>
+      <label>Settle time (minutes) <input type="number" name="settle_minutes" min="1" max="1440" value="{{ settings.settle_minutes }}">
+        <small>How long files must stay unchanged before a download counts as finished.</small></label>
+    </div>
+
+    <fieldset data-mode="qbittorrent" {{ 'disabled' if not settings.uses_qbit }}>
+      <legend>qBittorrent</legend>
+      <label>URL <input name="qbit_url" value="{{ settings.qbit_url }}" placeholder="http://192.168.1.10:8080" required>
+        <small>LAN address of the qBittorrent Web UI.</small></label>
+      <label>Username <input name="qbit_username" value="{{ settings.qbit_username }}" autocomplete="off">
+        <small>Leave empty only if qBittorrent bypasses authentication for this container's subnet.</small></label>
+      <label>Password <input type="password" name="qbit_password" value="" autocomplete="new-password" placeholder="{{ '•••••••• (saved, leave empty to keep)' if settings.qbit_password else '' }}">
+        {% if settings.qbit_password %}<span class="check small"><input type="checkbox" name="clear_qbit_password"> clear saved password</span>{% endif %}</label>
+    </fieldset>
+
+    <div>
+      <strong>Categories</strong>
+      <p class="small muted">Each <a href="/settings/libraries">library</a> has its own category.
+        <span data-mode="qbittorrent" {{ 'hidden' if not settings.uses_qbit }}>Only torrents in these categories are ever linked or deleted.</span>
+        <span data-mode="none" {{ 'hidden' if settings.uses_qbit }}>In folder mode a finished-download call must name one of them.</span></p>
+      <ul class="small">
+        {% for lib in libraries %}
+        <li>{% if lib.category %}<code>{{ lib.category }}</code>{% else %}<span class="muted">no category</span>{% endif %} → <a href="/settings/libraries/{{ lib.id }}">{{ lib.name }}</a>{% if not lib.enabled %} <span class="badge">disabled</span>{% endif %}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    <fieldset>
+      <legend>Remote path mapping</legend>
+      <p class="small muted">Needed when the download client's container sees downloads at a different path than this container. Example: remote <code>/downloads</code> → local <code>/data/torrents</code>.
+        <span data-mode="none" {{ 'hidden' if settings.uses_qbit }}>In folder mode it translates the path a finished-download call sends (<code>%F</code>).</span></p>
+      <label>Remote path (as the download client sees it) <input name="path_map_remote" value="{{ settings.path_map_remote }}" placeholder="/downloads"></label>
+      <label>Local path (inside this container) <input name="path_map_local" value="{{ settings.path_map_local }}" placeholder="/data/torrents"></label>
+    </fieldset>
+    <label>Warn when no new download for (hours) <input type="number" name="stale_download_hours" min="0" max="720" value="{{ settings.stale_download_hours }}">
+      <small>Shows a warning on the dashboard (and once in Activity) if no new download has finished for this long, e.g. when the RSS rule stopped working. 0 = off.</small></label>
+    <label class="check"><input type="checkbox" name="allow_public_hosts" {{ 'checked' if settings.allow_public_hosts }}>
+      <span>Allow non-LAN addresses for qBittorrent/Jellyfin
+      <small>Off by default. Only enable if your services are reachable only via a public IP.</small></span></label>
+    <div class="row">
+      <button class="primary" type="submit">Save</button>
+      <button type="button" data-test="/settings-test/qbittorrent" data-form="client-form" data-output="qbit-result" data-mode="qbittorrent" {{ 'hidden' if not settings.uses_qbit }}>Test</button>
+      <output class="test-result" id="qbit-result"></output>
+    </div>
+  </form>
+</section>
+
+{% elif section == 'retention' %}
+<section class="card">
+  <h2>Automatic delete</h2>
+  {% if not settings.uses_qbit %}
+  <div class="alert warn"><strong>Automatic delete needs qBittorrent.</strong> Periodica is watching the source
+    folder (Settings → <a href="/settings?section=client">Download client</a>), so nothing is ever deleted. These
+    settings are kept for when you switch back.</div>
+  {% else %}
+  <div class="alert warn">When armed, expired torrents in category <code>{{ settings.qbit_category or '?' }}</code> are removed from qBittorrent <strong>together with their downloaded files</strong>, and their issues are removed from the library.</div>
+  {% endif %}
+  <form method="post" action="/settings/retention" class="form-grid">
+    <fieldset class="plain" {{ 'disabled' if not settings.uses_qbit }}>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label class="check"><input type="checkbox" name="retention_enabled" {{ 'checked' if settings.retention_enabled }}> Enable automatic delete</label>
+    <div>
+      <strong>Days to keep</strong>
+      <p class="small muted">Set per library, counted from when qBittorrent finished the download (or the issue date
+        if unknown). Publications can override it on their own page.</p>
+      <ul class="small">
+        {% for lib in libraries %}<li><a href="/settings/libraries/{{ lib.id }}">{{ lib.name }}</a>: {{ lib.retention_days }} days{% if not lib.enabled %} (disabled, nothing is deleted){% endif %}</li>{% endfor %}
+      </ul>
+    </div>
+    <label>Grace period (hours) <input type="number" name="grace_hours" min="0" max="720" value="{{ settings.grace_hours }}">
+      <small>Expired items wait this long in the Deletions queue, where you can keep them.</small></label>
+    <label>Safety limit (torrents per run) <input type="number" name="max_torrent_deletions_per_run" min="1" max="500" value="{{ settings.max_torrent_deletions_per_run }}">
+      <small>If more are due at once, nothing is deleted until you approve the batch.</small></label>
+    <p class="small muted">Saving changes here disarms automatic delete. Review the dry-run preview on the <a href="/deletions">Deletions</a> page and arm it again.</p>
+    <div><button class="primary" type="submit">Save</button></div>
+    </fieldset>
+  </form>
+</section>
+
+{% elif section == 'jellyfin' %}
+<section class="card">
+  <h2>Jellyfin (optional)</h2>
+  <p class="muted">Used only to start a library scan after changes. Create a key in Jellyfin: Dashboard → API Keys.</p>
+  {% if settings.offline %}<div class="alert warn">Off: locked by <code>OFFLINE_MODE</code>. Periodica never contacts
+    Jellyfin in offline mode; these settings are kept for when the variable is removed.</div>{% endif %}
+  <form method="post" action="/settings/jellyfin" class="form-grid" id="jellyfin-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <fieldset class="plain" {{ 'disabled' if settings.offline }}>
+    <label class="check"><input type="checkbox" name="jellyfin_enabled" {{ 'checked' if settings.jellyfin_enabled }}>
+      <span>Use Jellyfin
+      <small>When off, Periodica never contacts Jellyfin; the URL and key below are kept. Without it, Jellyfin shows
+        new issues after its own library scan: turn on <em>real-time monitoring</em> for the library, or rely on its
+        scheduled scan.</small></span></label>
+    <label>URL <input name="jellyfin_url" value="{{ settings.jellyfin_url }}" placeholder="http://192.168.1.10:8096"></label>
+    <label>API key <input type="password" name="jellyfin_api_key" value="" autocomplete="off" placeholder="{{ '•••••••• (saved, leave empty to keep)' if settings.jellyfin_api_key else '' }}">
+      {% if settings.jellyfin_api_key %}<span class="check small"><input type="checkbox" name="clear_jellyfin_api_key"> clear saved key</span>{% endif %}</label>
+    <div>
+      <strong>Libraries to scan</strong>
+      <p class="small muted">Each Periodica library names the Jellyfin library to scan when it changes.</p>
+      <ul class="small">
+        {% for lib in libraries %}<li><a href="/settings/libraries/{{ lib.id }}">{{ lib.name }}</a> → {{ lib.jellyfin_library_name or 'all libraries' }}</li>{% endfor %}
+      </ul>
+    </div>
+    <div class="row">
+      <button class="primary" type="submit">Save</button>
+      <button type="button" data-test="/settings-test/jellyfin" data-form="jellyfin-form" data-output="jf-result">Test</button>
+      {% if settings.jellyfin_active %}
+      <button type="submit" formaction="/jellyfin/scan" formnovalidate
+              title="Ask Jellyfin to scan the libraries of all enabled Periodica libraries now, with the saved settings. The result appears in Activity and on the dashboard.">Scan library now</button>
+      {% endif %}
+      <output class="test-result" id="jf-result"></output>
+    </div>
+    </fieldset>
+  </form>
+</section>
+
+{% elif section == 'logging' %}
+<section class="card">
+  <h2>Logging</h2>
+  <form method="post" action="/settings/logging" class="form-grid">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>Log level
+      <select name="log_level">
+        <option value="info" {{ 'selected' if settings.log_level == 'info' }}>Info — what happened</option>
+        <option value="debug" {{ 'selected' if settings.log_level == 'debug' }}>Debug — one line per file and per API call</option>
+      </select>
+      <small>This is the level the app starts at. For a quick look at a problem happening right now, use
+        <em>Debug for 30 min</em> on the <a href="/system/logs">Logs</a> page: that expires on its own and
+        leaves this setting alone.</small></label>
+    <label>Size of one log file (MB) <input type="number" name="log_file_mb" min="0" max="50" value="{{ settings.log_file_mb }}">
+      <small><strong>0 writes no log files at all</strong> — useful to leave a disk asleep between scans, or to spare
+        an SSD. You then lose the technical log after a restart: <a href="/activity">Activity</a> still keeps 30 days
+        in the database, and the live view still works while the container runs. Note that Docker keeps writing its
+        own copy of these lines regardless (<code>docker logs</code>), unless you change the stack's logging
+        driver.</small></label>
+    <label>Log files kept <input type="number" name="log_files_kept" min="1" max="20" value="{{ settings.log_files_kept }}">
+      <small>{% if settings.log_file_mb %}At most {{ settings.log_file_mb * settings.log_files_kept }} MB in total: the
+        file rotates at the size above and the oldest copy is deleted. Files survive a restart and a redeploy, unlike
+        the live view.{% else %}Not used while log files are off. Existing files in <code>/config/logs</code> are left
+        alone; delete them yourself if you want the space back.{% endif %}</small></label>
+    <div><button class="primary" type="submit">Save</button></div>
+  </form>
+</section>
+
+{% elif section == 'account' %}
+<section class="card">
+  <h2>Change password</h2>
+  {% if pw_error %}<div class="alert error">{{ pw_error }}</div>{% endif %}
+  <form method="post" action="/account/password" class="form-grid">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>Current password <input type="password" name="current" autocomplete="current-password" required></label>
+    <label>New password <input type="password" name="new" autocomplete="new-password" minlength="10" required></label>
+    <label>Repeat new password <input type="password" name="new2" autocomplete="new-password" minlength="10" required></label>
+    <div><button class="primary" type="submit">Change password</button></div>
+  </form>
+</section>
+{% endif %}
+{% endblock %}

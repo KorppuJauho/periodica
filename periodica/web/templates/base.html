@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>{% block title %}Periodica{% endblock %} · Periodica</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ asset_v }}">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <script src="/static/app.js?v={{ asset_v }}" defer></script>
+</head>
+<body>
+{% if session %}
+<div class="layout">
+  <nav class="sidebar">
+    <a class="brand" href="/"><span class="logo">▤</span> Periodica</a>
+    <a href="/" class="{{ 'active' if nav == 'dashboard' }}">Dashboard</a>
+    <a href="/papers" class="{{ 'active' if nav in ('papers', 'paper') }}">Publications</a>
+    <a href="/deletions" class="{{ 'active' if nav == 'deletions' }}">Deletions</a>
+    <a href="/unmatched" class="{{ 'active' if nav == 'unmatched' }}">Unmatched</a>
+    <a href="/activity" class="{{ 'active' if nav == 'activity' }}">Activity</a>
+    {% set in_settings = nav in ('settings', 'settings_confirm') %}
+    <a href="/settings/libraries" class="{{ 'active' if in_settings }}">Settings</a>
+    {% if in_settings %}
+    <a href="/settings/libraries" class="sub {{ 'active' if section == 'libraries' }}">Libraries</a>
+      {% for key, label in [('client', 'Download client'), ('retention', 'Automatic delete'),
+                            ('jellyfin', 'Jellyfin'), ('logging', 'Logging'), ('account', 'Account')] %}
+    <a href="/settings?section={{ key }}" class="sub {{ 'active' if section == key }}">{{ label }}</a>
+      {% endfor %}
+    {% endif %}
+    {% set in_system = nav in ('system', 'logs', 'health') %}
+    <a href="/system" class="{{ 'active' if in_system }}">System</a>
+    {% if in_system %}
+    <a href="/system" class="sub {{ 'active' if nav == 'system' }}">Status</a>
+    <a href="/health" class="sub {{ 'active' if nav == 'health' }}">Library health</a>
+    <a href="/system/logs" class="sub {{ 'active' if nav == 'logs' }}">Logs</a>
+    {% endif %}
+    <div class="sidebar-build muted small" title="Version · Git commit">v{{ build }}</div>
+    <div class="sidebar-foot">
+      <span class="muted">{{ session.username }}</span>
+      <form method="post" action="/logout">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="link" type="submit">Sign out</button>
+      </form>
+    </div>
+  </nav>
+  <dialog id="confirm-dialog" class="confirm-dialog">
+    <h2>Please confirm</h2>
+    <p id="confirm-message"></p>
+    <div class="row">
+      <button type="button" class="danger" id="confirm-ok">Confirm</button>
+      <button type="button" id="confirm-cancel" autofocus>Cancel</button>
+    </div>
+  </dialog>
+  <main class="content">
+    {% if offline_mode %}<div class="alert warn offline-banner"><strong>Offline mode</strong> (<code>OFFLINE_MODE=true</code>):
+      no connections to qBittorrent, Jellyfin or scripts. Periodica only watches the source folder. Change the
+      container's environment to leave it.</div>{% endif %}
+    {% if flash %}<div class="alert ok">{{ flash }}</div>{% endif %}
+    {% if flash_error %}<div class="alert error">{{ flash_error }}</div>{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+{% else %}
+<main class="auth">
+  {% block auth %}{% endblock %}
+</main>
+{% endif %}
+</body>
+</html>
