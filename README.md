@@ -27,6 +27,8 @@ downloads after N days.
 LAN-only by design: it talks to your qBittorrent and Jellyfin and nothing else. qBittorrent and Jellyfin are
 both optional, and an offline mode switches off every outgoing connection.
 
+Tested against **Jellyfin 12.0 and 12.1** (in CI, end to end). Older Jellyfin versions are untested.
+
 ```
 /srv/data/torrents/books/news/                    (qBittorrent, category "news")
   Daily Newspapers 15 09 2026/

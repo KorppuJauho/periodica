@@ -49,4 +49,5 @@ First public release.
 - Only the chosen category is ever in scope; downloads are never written to; library folders are deleted only
   when they carry Periodica's marker.
 - LAN-only clients, hardened container, hash-locked dependencies, and CI running lint, type, security and
-  end-to-end tests against real qBittorrent and Jellyfin versions. See [SECURITY.md](SECURITY.md).
+  end-to-end tests against a real qBittorrent and real Jellyfin 12.0 and 12.1. Older Jellyfin versions are
+  untested. See [SECURITY.md](SECURITY.md).

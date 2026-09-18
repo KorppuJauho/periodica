@@ -52,7 +52,8 @@ in `<angle brackets>` with your own.
 
 ## 4. Jellyfin
 
-1. **Jellyfin 12 or newer:** nothing to install. **Jellyfin 10.11:** install the **Bookshelf** plugin and restart.
+1. **Jellyfin 12 or newer** — the only version this is tested on (CI runs 12.0 and 12.1). Nothing to install.
+   Older versions are untested and need the **Bookshelf** plugin; see [jellyfin-setup.md](jellyfin-setup.md).
 2. Add a library: content type **Books**, folder = the media folder as Jellyfin sees it (e.g.
    `/media/books/news`). Details, including which metadata fetchers to leave on, are in
    [jellyfin-setup.md](jellyfin-setup.md).
