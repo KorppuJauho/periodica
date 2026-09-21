@@ -1,0 +1,10 @@
+# Grype reads this file when the CI image scan runs. Every exception must say why it does not apply and when it
+# can be removed.
+ignore:
+  # CVE-2026-82049: tarfile extraction filters mishandle a hard link to a symlink (CPython <= 3.13.15).
+  # Periodica never extracts tar archives — comic and e-book archives are read with zipfile, and dependencies are
+  # installed as wheels at build time — so the vulnerable code is never reached.
+  # Remove this entry once the python:3.13-slim base image ships a patched release (Dependabot bumps the digest).
+  - vulnerability: CVE-2026-82049
+    package:
+      name: python
