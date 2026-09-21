@@ -139,6 +139,9 @@ dry run. Periodica only reads from qBittorrent and Jellyfin — it never creates
 - **Kept apart:** each category and name is used once, and no library's folders may sit inside another's. A scan
   refreshes only the Jellyfin libraries that changed. Publications, Deletions and Unmatched gain a library
   filter once you have more than one.
+- **One entry in Jellyfin:** several libraries can share one Jellyfin library placed over their common parent
+  folder, so Jellyfin shows a single entry with *News*, *Magazines* and so on as folders. See
+  [jellyfin-setup.md](jellyfin-setup.md#one-jellyfin-library-for-several-periodica-libraries).
 - **Disable** stops scanning a library and protects it from automatic delete. **Delete** forgets it inside
   Periodica only; files and downloads stay, and adding it again picks them up without linking anything twice.
 
