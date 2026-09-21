@@ -522,7 +522,8 @@ class Scanner:
         """Warn once per library when its downloads have stopped arriving."""
         category = lib.category if s.uses_qbit else FOLDER_CATEGORY
         last = self.repo.last_download_at(category, lib.id)
-        stale = last is not None and bool(s.stale_download_hours) and now - last > s.stale_download_hours * 3600
+        hours_allowed = lib.stale_download_hours
+        stale = last is not None and bool(hours_allowed) and now - last > hours_allowed * 3600
         warned = self.repo.get_state(STALE_WARNED_KEY)
         if not isinstance(warned, dict):   # a single value, as stored before libraries existed
             warned = {} if warned is None else {"1": warned}

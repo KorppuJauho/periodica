@@ -51,6 +51,8 @@ class Library(BaseModel):
     extra_extensions: str = "nfo"
     # When a download has an issue in several formats, the first of these is linked.
     format_priority: str = DEFAULT_PRIORITY
+    # Warn when nothing new has arrived for this many hours (0 = never). A daily paper and a monthly comic differ.
+    stale_download_hours: int = Field(default=36, ge=0, le=720)
 
     @field_validator("name")
     @classmethod

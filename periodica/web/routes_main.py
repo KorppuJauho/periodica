@@ -77,11 +77,10 @@ async def dashboard(request: Request, session: Session = Depends(require_session
     downloads = [overview.get(lib.id, {}).get("last_download") for lib in enabled]
     last_download = max((d for d in downloads if d), default=None)
     stale = []
-    if settings.stale_download_hours:
-        for lib in enabled:
-            last = overview.get(lib.id, {}).get("last_download")
-            if last and now - last > settings.stale_download_hours * 3600:
-                stale.append({"library": lib, "last": last})
+    for lib in enabled:
+        last = overview.get(lib.id, {}).get("last_download")
+        if lib.stale_download_hours and last and now - last > lib.stale_download_hours * 3600:
+            stale.append({"library": lib, "last": last})
     return render(
         request, "dashboard.html",
         settings=settings,
