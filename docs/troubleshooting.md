@@ -31,8 +31,9 @@ successful one. In this order:
    ```
    `{"status":"scan queued"}` means it works; `{"status":"ignored"…}` means the category isn't any library's.
 
-**qBittorrent behind a VPN container** (gluetun and similar) blocks traffic to the LAN, so the call times out.
-Allow the one server address in that container's firewall settings, e.g.
+**qBittorrent behind a VPN container** usually has its traffic to the LAN blocked, so the call times out. Allow
+the one server address in the VPN container's firewall settings; many VPN containers take an environment
+variable for this, for example:
 
 ```yaml
       - FIREWALL_OUTBOUND_SUBNETS=<server-ip>/32
