@@ -40,8 +40,7 @@ SECTION_FIELDS: dict[str, dict[str, str]] = {
     "general": {"scan_interval_minutes": "int"},
     "client": {"download_client": "str", "settle_minutes": "int",
                "qbit_url": "str", "qbit_username": "str", "qbit_password": "secret",  # nosec B105
-               "path_map_remote": "str", "path_map_local": "str", "allow_public_hosts": "bool",
-               "stale_download_hours": "int"},
+               "path_map_remote": "str", "path_map_local": "str", "allow_public_hosts": "bool"},
     "retention": {"retention_enabled": "bool", "grace_hours": "int", "max_torrent_deletions_per_run": "int"},
     "jellyfin": {"jellyfin_enabled": "bool", "jellyfin_url": "str", "jellyfin_api_key": "secret"},
     "logging": {"log_level": "str", "log_file_mb": "int", "log_files_kept": "int"},
@@ -57,7 +56,7 @@ FIELD_LABELS = {
     "download_client": "Download client", "settle_minutes": "Settle time",
     "qbit_url": "qBittorrent URL", "qbit_username": "Username", "qbit_password": "Password",  # nosec B105
     "qbit_category": "Category", "path_map_remote": "Remote path", "path_map_local": "Local path",
-    "allow_public_hosts": "Allow non-LAN addresses", "stale_download_hours": "Warn when no new download for",
+    "allow_public_hosts": "Allow non-LAN addresses",
     "retention_enabled": "Automatic delete",
     "retention_days": "Delete after (days)", "grace_hours": "Grace period (hours)",
     "max_torrent_deletions_per_run": "Safety limit per run", "jellyfin_enabled": "Use Jellyfin",

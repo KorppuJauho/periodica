@@ -27,7 +27,8 @@ First public release.
 
 ### Libraries
 - **Several libraries**, each with its own category, source and destination folders, Jellyfin library, title
-  formats, language, cover width, format priority, allowed extra file types and days to keep.
+  formats, language, cover width, format priority, allowed extra file types, days to keep, and how long it may
+  go without a new download before the dashboard warns.
 - An **Add-library wizard** that reads qBittorrent and Jellyfin and suggests the rest; it never creates
   anything in either.
 - Libraries can be disabled or removed, and are kept strictly apart from each other.

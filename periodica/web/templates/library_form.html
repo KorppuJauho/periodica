@@ -98,6 +98,10 @@
       <small>File types that may come along with the issues, e.g. <code>nfo, txt, jpg</code> (pdf, cbz, cbr and epub
         are issues, not extras). They are skipped: never linked, deleted together with the torrent, and they don't
         keep it from being deleted automatically. Any other file type does.</small></label>
+    <label>Warn when no new download for (hours) <input type="number" name="stale_download_hours" min="0" max="720" value="{{ library.stale_download_hours }}">
+      <small>Shows a warning on the dashboard (and once in Activity) when nothing new has arrived in this library for
+        this long, e.g. because the RSS rule stopped matching. Set it to fit how often the library's publications
+        come out; <code>0</code> = never warn.</small></label>
     <label>Delete after (days) <input type="number" name="retention_days" min="1" max="3650" value="{{ library.retention_days }}">
       <small>Only used when <a href="/settings?section=retention">automatic delete</a> is on and armed. Publications can
         override it on their own page.{% if settings.retention_armed %} Changing it disarms automatic delete until you

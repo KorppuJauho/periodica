@@ -32,7 +32,7 @@ LIBRARY_FIELDS = {
     "title_format": "title_format", "monthly_title_format": "monthly_title_format",
     "numbered_title_format": "numbered_title_format", "language": "language", "cover_width": "cover_width",
     "retention_days": "retention_days", "jellyfin_library_id": "jellyfin_library_id",
-    "jellyfin_library_name": "jellyfin_library_name",
+    "jellyfin_library_name": "jellyfin_library_name", "stale_download_hours": "stale_download_hours",
 }
 
 
