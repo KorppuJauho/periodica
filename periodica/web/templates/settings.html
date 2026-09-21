@@ -67,8 +67,6 @@
       <label>Remote path (as the download client sees it) <input name="path_map_remote" value="{{ settings.path_map_remote }}" placeholder="/downloads"></label>
       <label>Local path (inside this container) <input name="path_map_local" value="{{ settings.path_map_local }}" placeholder="/data/torrents"></label>
     </fieldset>
-    <label>Warn when no new download for (hours) <input type="number" name="stale_download_hours" min="0" max="720" value="{{ settings.stale_download_hours }}">
-      <small>Shows a warning on the dashboard (and once in Activity) if no new download has finished for this long, e.g. when the RSS rule stopped working. 0 = off.</small></label>
     <label class="check"><input type="checkbox" name="allow_public_hosts" {{ 'checked' if settings.allow_public_hosts }}>
       <span>Allow non-LAN addresses for qBittorrent/Jellyfin
       <small>Off by default. Only enable if your services are reachable only via a public IP.</small></span></label>

@@ -81,7 +81,8 @@ def _issue(row) -> IssueRow:
 
 LIBRARY_COLUMNS = ("name", "category", "source_dir", "dest_dir", "jellyfin_library_id", "jellyfin_library_name",
                    "title_format", "monthly_title_format", "numbered_title_format", "language", "cover_width",
-                   "retention_days", "enabled", "position", "extra_extensions", "format_priority")
+                   "retention_days", "enabled", "position", "extra_extensions", "format_priority",
+                   "stale_download_hours")
 
 
 def _library(row) -> Library:

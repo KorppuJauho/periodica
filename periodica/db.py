@@ -295,6 +295,13 @@ MIGRATIONS: list[str] = [
     """
     UPDATE libraries SET format_priority = 'cbz, pdf, epub, cbr' WHERE format_priority = 'cbz, cbr, pdf, epub';
     """,
+    # 9: the "no new downloads" warning is set per library. Every library starts from the shared value.
+    """
+    ALTER TABLE libraries ADD COLUMN stale_download_hours INTEGER NOT NULL DEFAULT 36;
+    UPDATE libraries SET stale_download_hours = COALESCE(
+        (SELECT CAST(json_extract(value, '$') AS INTEGER) FROM settings WHERE key = 'stale_download_hours'), 36);
+    DELETE FROM settings WHERE key = 'stale_download_hours';
+    """,
 ]
 
 

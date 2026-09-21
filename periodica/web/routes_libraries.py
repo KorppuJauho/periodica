@@ -40,7 +40,7 @@ router = APIRouter()
 PENDING_TTL = 15 * 60
 LIBRARY_FORM_FIELDS = ("name", "category", "source_dir", "dest_dir", "jellyfin_library_id", "jellyfin_library_name",
                        "title_format", "monthly_title_format", "numbered_title_format", "language", "cover_width",
-                       "retention_days", "extra_extensions", "format_priority")
+                       "retention_days", "extra_extensions", "format_priority", "stale_download_hours")
 # Changing these changes which files the library links (and, through the category, may delete).
 RISKY = {"category", "source_dir", "dest_dir"}
 LABELS = {
@@ -49,6 +49,7 @@ LABELS = {
     "title_format": "Title format", "monthly_title_format": "Title format for monthly issues",
     "numbered_title_format": "Title format for numbered issues", "language": "Language",
     "cover_width": "Cover width", "retention_days": "Delete after (days)", "enabled": "Enabled",
+    "stale_download_hours": "Warn when no new download for",
     "extra_extensions": "Other files allowed in a download", "format_priority": "Format priority",
 }
 
@@ -119,7 +120,8 @@ async def library_new(request: Request, session: Session = Depends(require_sessi
     draft = Library(name="New library", source_dir=template.source_dir, dest_dir=template.dest_dir,
                     title_format=template.title_format, monthly_title_format=template.monthly_title_format,
                     numbered_title_format=template.numbered_title_format, language=template.language,
-                    cover_width=template.cover_width, retention_days=template.retention_days)
+                    cover_width=template.cover_width, retention_days=template.retention_days,
+                    stale_download_hours=template.stale_download_hours)
     # The folders stay empty in the form so the wizard can suggest them.
     return _page(request, "library_form.html", library=draft, new=True, blank_folders=True)
 

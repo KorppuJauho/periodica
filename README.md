@@ -63,7 +63,7 @@ Step by step, with the RSS rule, the finished-download trigger and automatic del
 |---|---|
 | [Setup](docs/setup.md) | install, automations, libraries, running without qBittorrent or Jellyfin, offline mode, updates |
 | [Names and formats](docs/naming.md) | which files are linked, formats and priority, naming patterns, library health |
-| [Jellyfin](docs/jellyfin-setup.md) | library type, metadata providers, what Jellyfin reads |
+| [Jellyfin](docs/jellyfin-setup.md) | library type, metadata providers, one Jellyfin library for several libraries |
 | [Troubleshooting](docs/troubleshooting.md) | connections, the scan call, Jellyfin quirks, logs |
 | [Development](docs/development.md) | running from source, checks, tests, the module map |
 | [Security](SECURITY.md) | the threat model and what protects against what |

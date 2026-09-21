@@ -80,8 +80,9 @@ access and never sees your feed key.
 
 Uploaders rename their packs, so if downloads stop arriving, compare the rule with the current feed titles
 first; an alternation like `^(daily|morning) newspapers …` survives a rename. **System** shows a green check
-when the rule points at a library's category, and the dashboard warns per library if nothing has arrived for
-36 hours (configurable under Settings → Download client).
+when the rule points at a library's category, and the dashboard warns when a library has had nothing new for
+a while: 36 hours by default, set per library on its page (*Warn when no new download for*), so a weekly or
+monthly library can wait longer than a daily one. `0` turns it off for that library.
 
 ### B. Scan as soon as a download finishes
 
@@ -132,12 +133,15 @@ next to your other libraries, and the matching Jellyfin library. It checks the f
 dry run. Periodica only reads from qBittorrent and Jellyfin — it never creates a category or a Jellyfin library.
 
 - **Per library:** category, folders, Jellyfin library, title formats, language, cover width, format priority,
-  allowed extra file types and *Delete after (days)*.
+  allowed extra file types, the *no new downloads* warning and *Delete after (days)*.
 - **Shared:** the qBittorrent and Jellyfin connections, the scan API and key, the scan interval, and the
   automatic-delete switch, grace period and safety limit.
 - **Kept apart:** each category and name is used once, and no library's folders may sit inside another's. A scan
   refreshes only the Jellyfin libraries that changed. Publications, Deletions and Unmatched gain a library
   filter once you have more than one.
+- **One entry in Jellyfin:** several libraries can share one Jellyfin library placed over their common parent
+  folder, so Jellyfin shows a single entry with *News*, *Magazines* and so on as folders. See
+  [jellyfin-setup.md](jellyfin-setup.md#one-jellyfin-library-for-several-periodica-libraries).
 - **Disable** stops scanning a library and protects it from automatic delete. **Delete** forgets it inside
   Periodica only; files and downloads stay, and adding it again picks them up without linking anything twice.
 
