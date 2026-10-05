@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1
-# Base image pinned by digest; Dependabot keeps it updated.
-ARG PYTHON_IMAGE=python:3.13-slim-trixie@sha256:9d2e5553305c7c7b0097999bb17187c69b921ccd6bc9d40e4bb5ebe652c00285
+# Base image pinned by digest in this one FROM line, which Dependabot keeps updated (it does not read ARG values).
+FROM python:3.13-slim-trixie@sha256:3dd7cc108ec1493442514f5c2a871af6af0ec31d768ff6e378a93340c3b3db5f AS python
 
 # --- dependencies ---------------------------------------------------------------------------------
-FROM ${PYTHON_IMAGE} AS builder
+FROM python AS builder
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_NO_CACHE_DIR=1
 RUN python -m venv /venv
 COPY requirements.txt /tmp/requirements.txt
@@ -19,7 +19,7 @@ RUN /venv/bin/pip install --require-hashes --only-binary=:all: --no-deps -r /tmp
     && /venv/bin/python -m pip uninstall -y pip
 
 # --- runtime base ---------------------------------------------------------------------------------
-FROM ${PYTHON_IMAGE} AS base
+FROM python AS base
 RUN apt-get update \
     && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends poppler-utils \
