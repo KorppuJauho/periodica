@@ -1,6 +1,6 @@
 [project]
 name = "periodica"
-version = "1.0.0"
+version = "1.0.1"
 description = "Links newspapers, magazines and comics from qBittorrent into a Jellyfin Books library, with local metadata and covers."
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
