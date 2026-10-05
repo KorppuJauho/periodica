@@ -8,6 +8,15 @@ All notable changes to Periodica. Versions follow [semantic versioning](https://
 
 _Nothing yet._
 
+## [1.0.1]
+
+### Security
+- Base image updated to Python 3.13.16 on Debian 13.7, which fixes the OpenSSL, PCRE2 and Python issues
+  the image scan reported. Dependabot now keeps the base image up to date.
+
+### Dependencies
+- FastAPI 0.142.2 and uvicorn 0.54.0.
+
 ## [1.0.0]
 
 First public release.

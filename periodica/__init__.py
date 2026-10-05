@@ -1,6 +1,6 @@
 """periodica: newspaper PDFs from qBittorrent into a Jellyfin Books library."""
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 
 def app_version() -> str:
