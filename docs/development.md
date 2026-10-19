@@ -15,7 +15,7 @@ ruff check . && mypy periodica && bandit -c pyproject.toml -r periodica
 Dependencies are locked with hashes. To change them, edit `requirements*.in` and re-lock each file:
 
 ```bash
-uv pip compile requirements.in --python-platform x86_64-manylinux_2_28 --python-version 3.13 --generate-hashes -o requirements.txt
+uv pip compile requirements.in --python-platform x86_64-manylinux_2_28 --python-version 3.14 --generate-hashes -o requirements.txt
 ```
 
 ## The same checks in Docker (Linux or WSL)
