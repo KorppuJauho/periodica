@@ -8,8 +8,8 @@ Periodica writes files in the layout Jellyfin reads for books. This was checked 
 
 ## Which Jellyfin version?
 
-**Jellyfin 12 or newer.** That is the only version Periodica has been tried on: CI runs against Jellyfin 12.0
-and 12.1, and the maintainer runs 12.x. OPF metadata and local covers are built in there, so nothing needs
+**Jellyfin 12 or newer.** That is the only version Periodica has been tried on: CI runs against Jellyfin 12.1
+and 12.2, and the maintainer runs the newest 12.x. Earlier 12.x releases are not tested. OPF metadata and local covers are built in there, so nothing needs
 installing.
 
 **Older versions are untested.** They may work — a 10.x Jellyfin needs the **Bookshelf** plugin (Dashboard →

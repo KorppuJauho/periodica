@@ -6,7 +6,7 @@
 #   scripts/test-local.sh unit         unit tests inside the runtime image (Linux, poppler, non-root)
 #   scripts/test-local.sh integration  end-to-end test against a real qBittorrent
 #   scripts/test-local.sh jellyfin     end-to-end test against real qBittorrent + Jellyfin 12 (slower;
-#                                      JELLYFIN_IMAGE=jellyfin/jellyfin:12.0 scripts/test-local.sh jellyfin for another version)
+#                                      JELLYFIN_IMAGE=jellyfin/jellyfin:12.1 scripts/test-local.sh jellyfin for another version)
 #   scripts/test-local.sh ui           start Periodica + qBittorrent with sample newspapers for manual testing
 #   scripts/test-local.sh down         stop the ui/integration containers and remove their volumes
 set -euo pipefail
