@@ -47,7 +47,7 @@ extend-immutable-calls = ["fastapi.Depends", "fastapi.Form"]
 "tests/*" = ["S105", "S106", "S107", "S108", "S310", "S314", "RUF059"]
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.14"
 ignore_missing_imports = true
 check_untyped_defs = true
 
