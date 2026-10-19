@@ -61,8 +61,8 @@ services:
   # Jellyfin 12 reads metadata.opf and local covers natively.
   jellyfin:
     profiles: [jellyfin]
-    # JELLYFIN_IMAGE lets CI test several versions (see .github/workflows/ci.yml); default: 12.1
-    image: ${JELLYFIN_IMAGE:-jellyfin/jellyfin@sha256:78d3ea1207d1322471fcac39a614f004f2ccf7e878f95ab2977d752f07e4dd7e}
+    # JELLYFIN_IMAGE lets CI test several versions (see .github/workflows/ci.yml); default: 12.2
+    image: ${JELLYFIN_IMAGE:-jellyfin/jellyfin@sha256:357724bf0ae27a672c7cbaa899db2d9abeb13dbd8657ccce750258a4c059d037}
     user: "10001:10001"
     volumes:
       - jellyfin-config:/config

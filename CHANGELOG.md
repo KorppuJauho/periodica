@@ -8,6 +8,16 @@ All notable changes to Periodica. Versions follow [semantic versioning](https://
 
 _Nothing yet._
 
+## [1.0.2]
+
+### Compatibility
+- Tested against Jellyfin 12.1 and 12.2; 12.0 is no longer part of the test run.
+
+### Dependencies
+- The image runs on Python 3.14 (base image `python:3.14-slim-trixie`) instead of 3.13. Nothing changes in
+  configuration or data.
+- FastAPI 0.143.2.
+
 ## [1.0.1]
 
 ### Security
