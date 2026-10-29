@@ -6,7 +6,11 @@ All notable changes to Periodica. Versions follow [semantic versioning](https://
 
 ## [Unreleased]
 
-_Nothing yet._
+### Security
+- `opentelemetry-api` 1.45.1 (pulled in by FastAPI) fixes unbounded parsing of the `tracestate` header
+  (CVE-2026-114603).
+- FastAPI's built-in OpenTelemetry support is switched off. Periodica exports no traces, metrics or logs, so
+  incoming trace headers are no longer parsed at all.
 
 ## [1.0.2]
 
