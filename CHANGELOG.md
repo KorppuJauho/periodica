@@ -6,7 +6,11 @@ All notable changes to Periodica. Versions follow [semantic versioning](https://
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+- Naming patterns can cover the folders above a file, separated by `/`, for packs that carry the date only in
+  a folder name: `{any}.{year}.{month}.{day}/{any}/{paper}` links every publication in
+  `Daily.Pack.2026.10.18/<Publication>/<Publication>.pdf`. *Fix* suggests such a pattern when the file name
+  has no date but a folder above it does.
 
 ## [1.0.3]
 

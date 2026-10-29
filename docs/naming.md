@@ -61,6 +61,21 @@ the built-in rules, only in that library, and are listed on the library's page. 
 regular expression. For names the built-in rules already read, the **display name** on a publication's page
 renames them the same way.
 
+### Folders in a pattern
+
+Some packs put the date only in the download's folder name, and each file carries just the publication name:
+`Daily.Pack.2026.10.18/Evening.Post/Evening.Post.pdf`. A pattern can cover the folders above the file, one part
+per folder, separated by `/`:
+
+```
+{any}.{year}.{month}.{day}/{any}/{paper}
+```
+
+The pattern is matched against that many trailing parts of the file's path in the download, so the one pattern
+above links every publication in the pack, each under its own name with the pack's date. Each part follows the
+same rules as a file name; no placeholder reaches across a `/`, and a pattern covers the file name and at most
+three folders above it. When a file name has no date but a folder above it does, *Fix* suggests such a pattern.
+
 ## Month or issue number?
 
 `Business.Monthly.2026.09` could be September or issue 9, so Periodica decides per publication, and the first
