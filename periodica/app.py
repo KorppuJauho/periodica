@@ -97,7 +97,10 @@ def create_app(
                 with contextlib.suppress(asyncio.CancelledError):
                     await task
 
-    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
+    # Periodica exports no traces, metrics or logs: FastAPI's built-in OpenTelemetry support stays off, so
+    # incoming trace headers (traceparent, tracestate, baggage) are never parsed.
+    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan,
+                  telemetry={"tracing": False, "metrics": False, "logs": False})
     app.state.env = env
     app.state.db = db
     app.state.store = store

@@ -1,6 +1,6 @@
 [project]
 name = "periodica"
-version = "1.0.2"
+version = "1.0.3"
 description = "Links newspapers, magazines and comics from qBittorrent into a Jellyfin Books library, with local metadata and covers."
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
@@ -18,7 +18,7 @@ dependencies = [
 periodica = "periodica.__main__:main"
 
 [build-system]
-requires = ["setuptools>=84.0.0"]
+requires = ["setuptools>=84.2.1"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
@@ -47,7 +47,7 @@ extend-immutable-calls = ["fastapi.Depends", "fastapi.Form"]
 "tests/*" = ["S105", "S106", "S107", "S108", "S310", "S314", "RUF059"]
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.14"
 ignore_missing_imports = true
 check_untyped_defs = true
 
