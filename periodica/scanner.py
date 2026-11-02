@@ -24,6 +24,7 @@ from .linker import (
     issue_paths,
     link_book,
     move_issue_dir,
+    remove_issue_dir,
     replace_with_link,
     write_marker,
 )
@@ -278,6 +279,9 @@ class Scanner:
         self._changed_libraries = set()
         self._touched = {}
         self._seen_issues: set[int] = set()
+        # (download id, file) -> (publication, issue key) it is read as in this scan; finds duplicates left
+        # behind when a pattern or name change makes a linked file read as another issue.
+        self._claims: dict[tuple[str, str], tuple[str, str]] = {}
         self._patterns = {lib.id: self._load_patterns(lib.id) for lib in ready}
 
         client: QbitClient | None = None
@@ -562,12 +566,19 @@ class Scanner:
         return patterns
 
     def _parse(self, lib: Library, rel: str):
-        """The library's own patterns first (they may read folders too), then the built-in rules (file name)."""
+        """The library's own patterns first, then the built-in rules (file name).
+
+        A pattern that covers folders only fills a gap: it reads a file only when the built-in rules can't read
+        its name, so a pack mixing dated and undated file names keeps its dated files where they belong.
+        """
+        builtin = parse_issue_filename(PurePosixPath(rel).name)
         for pattern, publication in self._patterns.get(lib.id, []):
+            if pattern.parts > 1 and builtin is not None:
+                continue
             parsed = pattern.parse(rel, publication)
             if parsed is not None:
                 return parsed
-        return parse_issue_filename(PurePosixPath(rel).name)
+        return builtin
 
     def _inspect(self, lib: Library, source: Source, torrent: Download, report: ScanReport) -> TorrentSnapshot:
         source_root = Path(lib.source_dir)
@@ -738,6 +749,8 @@ class Scanner:
         issue = item.issue
         source_root, dest_root = Path(lib.source_dir), Path(lib.dest_dir)
         touched = self._touched.setdefault(lib.id, set())
+        for _suffix, local in [(item.ext, item.local_path), *item.alternatives]:
+            self._claims[(torrent.hash, str(local))] = (item.paper, issue.key)
         paper = self.repo.ensure_paper(item.paper, lib.id) if not report.dry_run else (
             self.repo.paper(item.paper, lib.id) or None)
         if paper is not None and not paper.enabled:
@@ -906,6 +919,10 @@ class Scanner:
             if issue.id in self._seen_issues or not self._watched(issue, dest_root) or not issue.dest_dir:
                 continue
             display = labels.get(issue.paper, issue.paper)
+            claim = self._claims.get((issue.torrent_hash or "", issue.source_path))
+            if claim is not None and claim != (issue.paper, issue.issue_key):
+                self._duplicate(lib, issue, display, dest_root, report)
+                continue
             problem = health.check_issue(health.paths_of(Path(issue.dest_dir), issue.file_ext), None, False)
             if problem:
                 self._health_problem(lib, issue, display, problem, report, gone=True)
@@ -916,6 +933,26 @@ class Scanner:
             elif issue.problem:
                 self.repo.clear_issue_problem(issue.id)
                 self.repo.log("info", f"Library health: {display} {issue.issue_label} is whole again")
+
+    def _duplicate(self, lib: Library, issue: IssueRow, display: str, dest_root: Path, report: ScanReport) -> None:
+        """A linked issue whose file this scan read as another issue: reported, and removed on Fix."""
+        if not issue.fix_requested:
+            self._health_problem(lib, issue, display, health.DUPLICATE, report)
+            return
+        try:
+            remove_issue_dir(Path(issue.dest_dir or ""), dest_root)
+        except (UnsafePathError, OSError) as exc:
+            self.repo.set_fix_requested([issue.id], False)
+            self.repo.log("error", f"Library health: could not remove the duplicate {display} "
+                                   f"{issue.issue_label}: {exc}")
+            return
+        self.repo.set_issue_status(issue.id, "excluded")
+        self.repo.clear_issue_problem(issue.id)
+        self.repo.set_fix_requested([issue.id], False)
+        report.fixed += 1
+        self._changed_libraries.add(lib.id)
+        self.repo.log("info", f"Library health: {display} {issue.issue_label} fixed "
+                              f"({health.FIXED[health.DUPLICATE]}; the download is not touched)")
 
     def _ensure_cover(self, lib: Library, paths, fmt: str, existing, now: float, report: ScanReport,
                       display: str, iso: str) -> tuple[str | None, bool]:

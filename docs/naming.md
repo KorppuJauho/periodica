@@ -76,6 +76,10 @@ above links every publication in the pack, each under its own name with the pack
 same rules as a file name; no placeholder reaches across a `/`, and a pattern covers the file name and at most
 three folders above it. When a file name has no date but a folder above it does, *Fix* suggests such a pattern.
 
+A folder pattern only fills a gap: it reads a file only when the built-in rules can't read the file's own name.
+A pack that mixes `Evening.Post.2026.10.18/Evening.Post.2026.10.18.pdf` with `Evening.Post/Evening.Post.pdf`
+keeps the dated files as the built-in rules read them, and the pattern reads only the undated ones.
+
 ## Month or issue number?
 
 `Business.Monthly.2026.09` could be September or issue 9, so Periodica decides per publication, and the first
@@ -101,14 +105,17 @@ Every scan checks that the issues already in the library are whole:
 
 - the issue folder and its file exist;
 - the file is still a hardlink to the download, not a copy or another file;
-- `metadata.opf` exists, and the cover too once one has been made.
+- `metadata.opf` exists, and the cover too once one has been made;
+- no other issue now claims its file: after a naming pattern or a publication name changes how a file is read,
+  the issue it used to be linked as is a **duplicate**.
 
 A damaged issue is **not repaired automatically**, not even a folder you deleted by hand. It is listed on
 **System → Library health** (and counted on the dashboard) until you choose:
 
 - **Fix** repairs it on the next scan, which starts right away: linked again, a copy replaced with a link to
   the download (only in folders carrying Periodica's marker, and you confirm first), missing metadata or cover
-  written again. Jellyfin is asked to refresh afterwards. **Fix all** does the lot.
+  written again, a duplicate's folder deleted (the download and the issue its file belongs to stay). Jellyfin
+  is asked to refresh afterwards. **Fix all** does the lot.
 - **Remove** takes the issue out of the library for good; it is not linked again.
 
 If the download is gone as well, only Remove is offered. If you put the file back yourself, the problem clears
