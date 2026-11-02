@@ -12,6 +12,10 @@ All notable changes to Periodica. Versions follow [semantic versioning](https://
   `Daily.Pack.2026.10.18/<Publication>/<Publication>.pdf`. *Fix* suggests such a pattern when the file name
   has no date but a folder above it does.
 
+### Security
+- Base image with Python 3.14.10, which fixes CVE-2026-115557 (the `ssl` module trusted compromised
+  intermediate certificates; relevant when qBittorrent or Jellyfin is reached over `https://`).
+
 ## [1.0.3]
 
 ### Security
