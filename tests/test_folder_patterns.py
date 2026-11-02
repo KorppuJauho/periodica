@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import time
 from datetime import date
+from pathlib import Path, PurePosixPath
 
 import pytest
 
+from periodica.health import DUPLICATE
 from periodica.issues import DAY, NUMBER
+from periodica.parser import parse_issue_filename
 from periodica.patterns import MAX_PARTS, compile_pattern, suggest_pattern
+from periodica.scanner import Scanner
 
 from .helpers import write_torrent_files
 from .test_web import setup_admin
@@ -137,3 +141,76 @@ def test_fix_suggests_a_folder_pattern_and_previews_the_whole_pack(client):
         "csrf_token": token, "pattern": PACK, "publication": "", "filename": FILES[0], "torrent": h})
     assert r.status_code == 303
     assert world.scanner.run().linked == 2
+
+
+# --- a pack that mixes dated and undated file names ------------------------------------------------------
+MIXED = ["Daily.Pack.2026.10.18/Evening.Post.2026.10.18/Evening.Post.2026.10.18.pdf",
+         "Daily.Pack.2026.10.18/Chronicle.Weekend/Chronicle.Weekend.pdf"]
+
+
+def _parse_as_in_1_1_0(self, lib, rel):
+    """Patterns before the built-in rules even for folder patterns: how 1.1.0 read a mixed pack."""
+    for pattern, publication in self._patterns.get(lib.id, []):
+        parsed = pattern.parse(rel, publication)
+        if parsed is not None:
+            return parsed
+    return parse_issue_filename(PurePosixPath(rel).name)
+
+
+def test_a_folder_pattern_leaves_names_the_built_in_rules_read(world):
+    add_dated_pack(world, files=MIXED)
+    world.repo.add_name_pattern(1, PACK, "")
+    report = world.scanner.run()
+    assert report.linked == 2 and report.unmatched == 0
+    assert {p.name for p in world.repo.papers(1)} == {"Evening Post", "Chronicle Weekend"}
+    assert world.repo.issue_by_key("Evening Post", "2026-10-18", 1) is not None
+
+
+def test_duplicates_left_by_a_pattern_are_reported_and_removed_on_fix(world, monkeypatch):
+    add_dated_pack(world, files=MIXED)
+    assert world.scanner.run().linked == 1, "the dated file is linked by the built-in rules"
+    right = world.repo.issue_by_key("Evening Post", "2026-10-18", 1)
+
+    # 1.1.0 then read the dated file as a publication called "Evening Post 2026 10 18".
+    world.repo.add_name_pattern(1, PACK, "")
+    with monkeypatch.context() as m:
+        m.setattr(Scanner, "_parse", _parse_as_in_1_1_0)
+        m.setattr(Scanner, "_duplicate", lambda *a, **kw: None)
+        assert world.scanner.run().linked == 2
+    wrong = world.repo.issue_by_key("Evening Post 2026 10 18", "2026-10-18", 1)
+    wrong_dir = Path(wrong.dest_dir)
+    assert wrong_dir.is_dir()
+
+    report = world.scanner.run()
+    assert report.linked == 0 and report.health_problems == 1
+    assert world.repo.issue_by_key("Evening Post 2026 10 18", "2026-10-18", 1).problem == DUPLICATE
+    assert world.repo.issue_by_key("Evening Post", "2026-10-18", 1).problem is None
+
+    assert world.repo.set_fix_requested([wrong.id]) == 1
+    report = world.scanner.run()
+    assert report.fixed == 1 and report.health_problems == 0
+    assert not wrong_dir.exists() and not wrong_dir.parent.exists(), "the duplicate's folders are gone"
+    assert world.repo.issue_by_key("Evening Post 2026 10 18", "2026-10-18", 1).status == "excluded"
+    assert Path(right.dest_dir).is_dir(), "the issue the file belongs to stays"
+    assert Path(world.repo.issue_by_key("Chronicle Weekend", "2026-10-18", 1).dest_dir).is_dir()
+    for source in MIXED:
+        assert (world.source / source).is_file(), "the download is not touched"
+    again = world.scanner.run()
+    assert again.linked == 0 and again.health_problems == 0
+
+
+def test_health_page_explains_duplicates(client, monkeypatch):
+    setup_admin(client)
+    world = client.world
+    add_dated_pack(world, files=MIXED)
+    world.scanner.run()
+    world.repo.add_name_pattern(1, PACK, "")
+    with monkeypatch.context() as m:
+        m.setattr(Scanner, "_parse", _parse_as_in_1_1_0)
+        m.setattr(Scanner, "_duplicate", lambda *a, **kw: None)
+        world.scanner.run()
+    world.scanner.run()
+    page = client.get("/health").text
+    assert "duplicate: its file is now read as another issue of the same download" in page
+    assert "Evening Post 2026 10 18" in page and "Fix all (1)" in page
+    assert "A duplicate's folder is deleted from the library" in page
