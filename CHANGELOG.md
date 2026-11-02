@@ -6,6 +6,10 @@ All notable changes to Periodica. Versions follow [semantic versioning](https://
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [1.1.1]
+
 ### Fixed
 - A naming pattern that covers folders (new in 1.1.0) also read files the built-in rules already read, so a
   pack mixing dated and undated file names linked its dated files a second time, under publication names
@@ -16,6 +20,10 @@ All notable changes to Periodica. Versions follow [semantic versioning](https://
 - Library health reports a **duplicate**: a linked issue whose file is now read as another issue of the same
   download. **Fix** (or **Fix all**) deletes the duplicate's folder; the download and the right issue stay.
   This cleans up what the problem above left behind.
+
+### Upgrading
+- If a folder pattern linked issues twice in 1.1.0, the first scan lists them on **System → Library health** as
+  duplicates; **Fix all** removes them. No settings or data change otherwise.
 
 ## [1.1.0]
 
