@@ -14,7 +14,7 @@
   {% set fixable = items | selectattr('fixable') | list %}
   {% if fixable %}
   <form method="post" action="/health/fix" class="row"
-        {% if fixable | selectattr('problem', 'equalto', 'copy') | list %}data-confirm="Fix {{ fixable | length }} issue(s)? For a file that is a copy, the file in the library is deleted and replaced with a link to the download."{% endif %}>
+        {% if fixable | selectattr('problem', 'in', ['copy', 'duplicate']) | list %}data-confirm="Fix {{ fixable | length }} issue(s)? For a file that is a copy, the file in the library is deleted and replaced with a link to the download. A duplicate's folder is deleted from the library; the download and the issue its file now belongs to stay."{% endif %}>
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <input type="hidden" name="all" value="1">
     <input type="hidden" name="library" value="{{ selected_library or '' }}">
@@ -35,7 +35,7 @@
       <td class="small">{{ p.problem_since | ago }}</td>
       <td class="right actions">
         {% if p.fixable and not p.fix_requested %}
-        <form method="post" action="/health/fix"{% if p.problem == 'copy' %} data-confirm="Replace the file of {{ p.label }} {{ p.issue_label }} with a link to the download? The file now in the library is deleted."{% endif %}>
+        <form method="post" action="/health/fix"{% if p.problem == 'copy' %} data-confirm="Replace the file of {{ p.label }} {{ p.issue_label }} with a link to the download? The file now in the library is deleted."{% elif p.problem == 'duplicate' %} data-confirm="Remove the duplicate {{ p.label }} {{ p.issue_label }} from the library? Its folder is deleted; the download and the issue its file now belongs to stay."{% endif %}>
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <input type="hidden" name="issue_id" value="{{ p.id }}">
           <button class="primary" type="submit">Fix</button>

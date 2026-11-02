@@ -15,18 +15,21 @@ MISSING = "missing"
 COPY = "copy"
 METADATA = "metadata"
 COVER = "cover"
+DUPLICATE = "duplicate"
 
 PROBLEMS = {
     MISSING: "issue file or folder missing from the library",
     COPY: "the file in the library is not a link to the download (a copy or another file)",
     METADATA: "metadata.opf missing",
     COVER: "cover image missing",
+    DUPLICATE: "duplicate: its file is now read as another issue of the same download",
 }
 FIXED = {
     MISSING: "linked again",
     COPY: "replaced with a link to the download",
     METADATA: "metadata written again",
     COVER: "cover rendered again",
+    DUPLICATE: "duplicate removed from the library",
 }
 
 
