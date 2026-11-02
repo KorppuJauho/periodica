@@ -543,7 +543,8 @@ async def pattern_new(library_id: int, request: Request, torrent: str = "", path
     library = _library_or_404(request, library_id)
     if library is None:
         return PlainTextResponse("not found", status_code=404)
-    filename = Path(path).name if path else ""
+    # The file's path inside the download: a pattern may read the folders above the file as well.
+    filename = path.replace("\\", "/").strip("/") if path else ""
     pattern, publication, _kind = suggest_pattern(filename) if filename else ("", "", "")
     return _page(request, "pattern_form.html", library=library, filename=filename, pattern=pattern,
                  publication=publication, torrent=torrent,
@@ -568,19 +569,19 @@ async def pattern_preview(library_id: int, request: Request, session: Session = 
     result: dict = {"ok": True, "kind": pattern.kind, "matches": []}
     if filename:
         parsed = pattern.parse(filename, publication)
+        shown = pattern.shown(filename) or Path(filename).name
         if parsed is None:
-            result.update(ok=False, message=f"{filename} does not match this pattern.")
+            result.update(ok=False, message=f"{shown} does not match this pattern.")
         else:
-            result["message"] = f"{filename} → {_describe(parsed)}"
+            result["message"] = f"{shown} → {_describe(parsed)}"
     else:
         result["message"] = "The pattern is valid."
     for row in _unmatched_names(state.repo, library_id):
-        name = Path(row["path"]).name
-        if name == filename:
+        if row["path"] == filename or Path(row["path"]).name == filename:
             continue
-        parsed = pattern.parse(name, publication)
+        parsed = pattern.parse(row["path"], publication)
         if parsed is not None:
-            result["matches"].append(f"{name} → {_describe(parsed)}")
+            result["matches"].append(f"{pattern.shown(row['path'])} → {_describe(parsed)}")
     return JSONResponse(result)
 
 

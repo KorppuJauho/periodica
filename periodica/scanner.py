@@ -8,7 +8,7 @@ import threading
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field, replace
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from . import covers, health
 from .config import Env
@@ -561,13 +561,13 @@ class Scanner:
                 log.warning("ignoring the stored pattern %r: %s", row["pattern"], exc)
         return patterns
 
-    def _parse(self, lib: Library, filename: str):
-        """The library's own patterns first, then the built-in rules."""
+    def _parse(self, lib: Library, rel: str):
+        """The library's own patterns first (they may read folders too), then the built-in rules (file name)."""
         for pattern, publication in self._patterns.get(lib.id, []):
-            parsed = pattern.parse(filename, publication)
+            parsed = pattern.parse(rel, publication)
             if parsed is not None:
                 return parsed
-        return parse_issue_filename(filename)
+        return parse_issue_filename(PurePosixPath(rel).name)
 
     def _inspect(self, lib: Library, source: Source, torrent: Download, report: ScanReport) -> TorrentSnapshot:
         source_root = Path(lib.source_dir)
@@ -603,7 +603,7 @@ class Scanner:
                 snap.problems.append(f"{rel.name} is outside the source folder")
                 unmatched.append((str(rel), f"outside source folder (resolved to {local})"))
                 continue
-            parsed = self._parse(lib, rel.name)
+            parsed = self._parse(lib, str(rel))
             if parsed is None:
                 if str(rel) in ignored:
                     # The user chose to ignore it: not an issue, and no longer a reason to keep the torrent.

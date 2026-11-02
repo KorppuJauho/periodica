@@ -8,6 +8,22 @@ All notable changes to Periodica. Versions follow [semantic versioning](https://
 
 _Nothing yet._
 
+## [1.1.0]
+
+### Added
+- Naming patterns can cover the folders above a file, separated by `/`, for packs that carry the date only in
+  a folder name: `{any}.{year}.{month}.{day}/{any}/{paper}` links every publication in
+  `Daily.Pack.2026.10.18/<Publication>/<Publication>.pdf`. *Fix* suggests such a pattern when the file name
+  has no date but a folder above it does.
+
+### Security
+- Base image with Python 3.14.10, which fixes CVE-2026-115557 (the `ssl` module trusted compromised
+  intermediate certificates; relevant when qBittorrent or Jellyfin is reached over `https://`).
+
+### Upgrading
+- No settings or data change. An image pinned to `:1.0` stays on 1.0.3 and does not get the Python fix;
+  use `:1.1`, `:stable` or `:latest`.
+
 ## [1.0.3]
 
 ### Security

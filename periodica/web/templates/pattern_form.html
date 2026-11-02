@@ -28,6 +28,9 @@
         <code>{paper}</code> the publication name, read from the file ·
         <code>{any}</code> text to skip.
         Dots, spaces, dashes and underscores match each other; letters match in any case.
+        When the date is in a folder name, cover the folders with <code>/</code>:
+        <code>{any}.{year}.{month}.{day}/{any}/{paper}</code> reads
+        <code>Daily.Pack.2026.10.18/Evening.Post/Evening.Post.pdf</code>.
       </small></label>
     <label>Publication <input name="publication" value="{{ publication }}" list="publication-options" maxlength="120" data-pattern-field
                               placeholder="Duck Weekly">
