@@ -177,16 +177,21 @@ def log_dir(config_dir: Path) -> Path:
     return Path(config_dir) / LOG_DIR_NAME
 
 
-def log_files(config_dir: Path) -> list[tuple[str, int, float]]:
-    """(name, size, modified) for the current log file and its rotated copies, newest first."""
+def log_paths(config_dir: Path) -> list[Path]:
+    """The current log file and its rotated copies (plain files only)."""
     directory = log_dir(config_dir)
     if not directory.is_dir():
         return []
+    return [path for path in directory.iterdir()
+            if path.is_file() and not path.is_symlink() and path.name.startswith(LOG_FILE_NAME)]
+
+
+def log_files(config_dir: Path) -> list[tuple[str, int, float]]:
+    """(name, size, modified) for the current log file and its rotated copies, newest first."""
     files = []
-    for path in directory.iterdir():
-        if path.is_file() and not path.is_symlink() and path.name.startswith(LOG_FILE_NAME):
-            stat = path.stat()
-            files.append((path.name, stat.st_size, stat.st_mtime))
+    for path in log_paths(config_dir):
+        stat = path.stat()
+        files.append((path.name, stat.st_size, stat.st_mtime))
     return sorted(files, key=lambda item: item[2], reverse=True)
 
 

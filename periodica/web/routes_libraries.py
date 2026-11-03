@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import ValidationError
 
 from ..auth import Session
@@ -32,7 +32,7 @@ from ..netsafe import HttpError, UnsafeUrlError
 from ..paths import PathMapping, is_within, same_filesystem
 from ..qbittorrent import QbitError
 from ..scanner import all_problems, library_problems
-from .deps import render, require_csrf, require_session
+from .deps import local_redirect, render, require_csrf, require_session
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -103,12 +103,12 @@ async def library_enabled(library_id: int, request: Request, session: Session = 
     form = await request.form()
     enabled = form.get("enabled") == "true"
     if not enabled and len([lib for lib in state.repo.libraries() if lib.enabled]) == 1 and library.enabled:
-        return RedirectResponse("/settings/libraries?msg=last_enabled", status_code=303)
+        return local_redirect("/settings/libraries?msg=last_enabled", status_code=303)
     state.repo.update_library(library.model_copy(update={"enabled": enabled}))
     word = "enabled" if enabled else "disabled"
     state.repo.log("info", f"Library '{library.name}' {word} by {session.username}")
     state.scan_event.set()
-    return RedirectResponse(f"/settings/libraries?msg=library_{word}", status_code=303)
+    return local_redirect(f"/settings/libraries?msg=library_{word}", status_code=303)
 
 
 # --- add (wizard) -------------------------------------------------------------------------------------
@@ -147,7 +147,7 @@ async def library_create(request: Request, session: Session = Depends(require_cs
                            f"'{library.category or '-'}', {library.source_dir} -> {library.dest_dir})")
     log.info("library %r added by %s", library.name, session.username)
     state.scan_event.set()
-    return RedirectResponse(f"/settings/libraries/{library_id}?msg=library_added", status_code=303)
+    return local_redirect(f"/settings/libraries/{library_id}?msg=library_added", status_code=303)
 
 
 def _draft(form) -> Library:
@@ -377,7 +377,7 @@ async def library_save(library_id: int, request: Request, session: Session = Dep
         return _page(request, "library_form.html", 400, library=new, new=False, errors=conflicts)
     changed = {k for k in LIBRARY_FORM_FIELDS if getattr(current, k) != getattr(new, k)}
     if not changed:
-        return RedirectResponse(f"/settings/libraries/{library_id}?msg=saved", status_code=303)
+        return local_redirect(f"/settings/libraries/{library_id}?msg=saved", status_code=303)
     if changed & RISKY:
         preview = await asyncio.to_thread(state.scanner.run, True, None, None, [new])
         token = secrets.token_urlsafe(24)
@@ -390,7 +390,7 @@ async def library_save(library_id: int, request: Request, session: Session = Dep
                       folder_mode=not settings.uses_qbit, disarms=settings.retention_armed,
                       confirm_action=f"/settings/libraries/{library_id}/confirm")
     _commit(request, session, current, new, changed)
-    return RedirectResponse(f"/settings/libraries/{library_id}?msg=saved", status_code=303)
+    return local_redirect(f"/settings/libraries/{library_id}?msg=saved", status_code=303)
 
 
 @router.post("/settings/libraries/{library_id}/confirm")
@@ -405,19 +405,19 @@ async def library_confirm(library_id: int, request: Request, session: Session = 
     if (not pending or not isinstance(token, str) or not secrets.compare_digest(pending["token"], token)
             or pending["expires"] < time.time() or pending["library"].get("id") != library_id
             or form.get("action") != "confirm"):
-        return RedirectResponse(f"{back}?msg=cancelled", status_code=303)
+        return local_redirect(f"{back}?msg=cancelled", status_code=303)
     current = _library_or_404(request, library_id)
     if current is None:
         return PlainTextResponse("not found", status_code=404)
     try:
         new = Library(**pending["library"])
     except ValidationError:
-        return RedirectResponse(f"{back}?msg=cancelled", status_code=303)
+        return local_redirect(f"{back}?msg=cancelled", status_code=303)
     if library_conflicts(new, state.repo.libraries()):
-        return RedirectResponse(f"{back}?msg=cancelled", status_code=303)
+        return local_redirect(f"{back}?msg=cancelled", status_code=303)
     changed = {k for k in LIBRARY_FORM_FIELDS if getattr(current, k) != getattr(new, k)}
     _commit(request, session, current, new, changed)
-    return RedirectResponse(f"{back}?msg=saved", status_code=303)
+    return local_redirect(f"{back}?msg=saved", status_code=303)
 
 
 def _commit(request: Request, session: Session, current: Library, new: Library, changed: set[str]) -> None:
@@ -478,7 +478,7 @@ async def library_delete(library_id: int, request: Request, session: Session = D
     if len(state.repo.libraries()) == 1:
         return PlainTextResponse("The last library cannot be deleted.", status_code=409)
     if form.get("confirm") != "yes":
-        return RedirectResponse(f"/settings/libraries/{library_id}/delete", status_code=303)
+        return local_redirect(f"/settings/libraries/{library_id}/delete", status_code=303)
     if not state.scanner.try_lock():
         return _page(request, "library_delete.html", 409, library=library,
                      issues=state.repo.library_issue_counts().get(library_id, 0), only_one=False,
@@ -490,7 +490,7 @@ async def library_delete(library_id: int, request: Request, session: Session = D
     state.repo.log("warning", f"Library '{library.name}' deleted by {session.username}; its files in "
                               f"{library.dest_dir} and its downloads were left alone")
     log.warning("library %r deleted by %s", library.name, session.username)
-    return RedirectResponse("/settings/libraries?msg=library_deleted", status_code=303)
+    return local_redirect("/settings/libraries?msg=library_deleted", status_code=303)
 
 
 # --- Jellyfin -----------------------------------------------------------------------------------------
@@ -506,10 +506,10 @@ async def library_jellyfin_scan(library_id: int, request: Request, session: Sess
 
         return PlainTextResponse(OFFLINE_MESSAGE, status_code=409)
     if not settings.jellyfin_active:
-        return RedirectResponse(f"/settings/libraries/{library_id}?msg=jf_off", status_code=303)
+        return local_redirect(f"/settings/libraries/{library_id}?msg=jf_off", status_code=303)
     state.scanner.jellyfin.request(settings, f"manual library scan by {session.username}",
                                    targets=[library.jellyfin_target])
-    return RedirectResponse(f"/settings/libraries/{library_id}?msg=jf_scan", status_code=303)
+    return local_redirect(f"/settings/libraries/{library_id}?msg=jf_scan", status_code=303)
 
 # --- file name patterns ------------------------------------------------------------------------------
 def _unmatched_names(repo, library_id: int) -> list[dict]:
@@ -620,7 +620,7 @@ async def pattern_save(library_id: int, request: Request, session: Session = Dep
     from ..app import request_scan
 
     request_scan(request.app, f"File name pattern added by {session.username}")
-    return RedirectResponse("/unmatched?msg=pattern_added", status_code=303)
+    return local_redirect("/unmatched?msg=pattern_added", status_code=303)
 
 
 @router.post("/settings/libraries/{library_id:int}/patterns/{pattern_id:int}/delete")
@@ -631,4 +631,4 @@ async def pattern_delete(library_id: int, pattern_id: int, request: Request, ses
         return PlainTextResponse("not found", status_code=404)
     state.repo.log("info", f"{session.username} deleted a file name pattern of library '{library.name}'; "
                            "issues already linked stay in the library")
-    return RedirectResponse(f"/settings/libraries/{library_id}?msg=pattern_deleted#patterns", status_code=303)
+    return local_redirect(f"/settings/libraries/{library_id}?msg=pattern_deleted#patterns", status_code=303)

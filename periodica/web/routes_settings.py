@@ -19,7 +19,7 @@ from ..netsafe import HttpError, UnsafeUrlError
 from ..qbittorrent import QbitError
 from ..scanner import all_problems
 from ..settings import OFFLINE_MESSAGE, Settings
-from .deps import render, require_csrf, require_session
+from .deps import local_redirect, render, require_csrf, require_session
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -87,14 +87,14 @@ async def settings_page(request: Request, section: str = "libraries", session: S
     if section == "library":   # the page from before libraries existed: the first library
         libraries = request.app.state.repo.libraries()
         target = f"/settings/libraries/{libraries[0].id}" if libraries else "/settings/libraries"
-        return RedirectResponse(target, status_code=303)
+        return local_redirect(target, status_code=303)
     if section not in SECTIONS or section == "libraries":
-        return RedirectResponse("/settings/libraries", status_code=303)
+        return local_redirect("/settings/libraries", status_code=303)
     return _page(request, section, request.app.state.store.load())
 
 
 def _back(section: str, msg: str) -> RedirectResponse:
-    return RedirectResponse(f"{SECTION_PAGE.get(section, f'/settings?section={section}')}"
+    return local_redirect(f"{SECTION_PAGE.get(section, f'/settings?section={section}')}"
                             f"{'&' if section not in SECTION_PAGE else '?'}msg={msg}", status_code=303)
 
 
@@ -190,19 +190,19 @@ async def settings_confirm(request: Request, session: Session = Depends(require_
     token = form.get("token")
     if (not pending or not isinstance(token, str) or not secrets.compare_digest(pending["token"], token)
             or pending["expires"] < time.time()):
-        return RedirectResponse("/settings?msg=cancelled", status_code=303)
+        return local_redirect("/settings?msg=cancelled", status_code=303)
     if form.get("action") != "confirm":
-        return RedirectResponse(f"/settings?section={pending['section']}&msg=cancelled", status_code=303)
+        return local_redirect(f"/settings?section={pending['section']}&msg=cancelled", status_code=303)
     current = state.store.load()
     try:
         new = Settings(**pending["settings"])
     except ValidationError:
-        return RedirectResponse("/settings?msg=cancelled", status_code=303)
+        return local_redirect("/settings?msg=cancelled", status_code=303)
     new.api_key = current.api_key
     new = state.store.effective(new)
     changed = _changed(current, new)
     _commit(request, session, current, new, changed)
-    return RedirectResponse(f"/settings?section={pending['section']}&msg=saved", status_code=303)
+    return local_redirect(f"/settings?section={pending['section']}&msg=saved", status_code=303)
 
 
 def _commit(request: Request, session: Session, current: Settings, new: Settings, changed: set[str]) -> None:
@@ -240,11 +240,11 @@ async def jellyfin_scan(request: Request, session: Session = Depends(require_csr
     if settings.offline:
         return PlainTextResponse(OFFLINE_MESSAGE, status_code=409)
     if not settings.jellyfin_active:
-        return RedirectResponse("/settings?section=jellyfin&msg=jf_off", status_code=303)
+        return local_redirect("/settings?section=jellyfin&msg=jf_off", status_code=303)
     log.info("manual Jellyfin library scan requested by %s", session.username)
     targets = [lib.jellyfin_target for lib in state.repo.libraries(enabled_only=True)]
     state.scanner.jellyfin.request(settings, f"manual library scan by {session.username}", targets=targets)
-    return RedirectResponse("/settings?section=jellyfin&msg=jf_scan", status_code=303)
+    return local_redirect("/settings?section=jellyfin&msg=jf_scan", status_code=303)
 
 
 # --- connection tests (JSON, used by app.js) ----------------------------------------------------
