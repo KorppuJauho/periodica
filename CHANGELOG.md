@@ -8,6 +8,15 @@ All notable changes to Periodica. Versions follow [semantic versioning](https://
 
 _Nothing yet._
 
+## [1.1.2]
+
+### Security
+- Every page redirect goes through one check that only allows this app's own pages, and the log download
+  takes the file from Periodica's own log folder listing (both found by GitHub code scanning; neither was
+  exploitable).
+- Development and test tools: `certifi`, `urllib3`, `msgpack` and `filelock` updated for published
+  vulnerabilities. They are not part of the image.
+
 ## [1.1.1]
 
 ### Fixed

@@ -23,14 +23,14 @@ from ..paths import UnsafePathError, is_within, same_filesystem
 from ..retention import APPROVAL_KEY, BLOCKED_KEY, PREVIEW_KEY
 from ..scanner import LAST_SCAN_KEY, all_problems
 from .connections import connections
-from .deps import _ago, _datetime, render, require_csrf, require_session
+from .deps import _ago, _datetime, local_redirect, render, require_csrf, require_session
 
 log = logging.getLogger(__name__)
 router = APIRouter()
 
 
 def _back(path: str, msg: str) -> RedirectResponse:
-    return RedirectResponse(f"{path}?msg={msg}", status_code=303)
+    return local_redirect(f"{path}?msg={msg}", status_code=303)
 
 
 LIBRARY_COOKIE = "periodica_library"
@@ -177,7 +177,7 @@ async def paper_legacy(name: str, request: Request, session: Session = Depends(r
     matches = [p for p in request.app.state.repo.papers() if p.name == name]
     if len(matches) != 1:
         return PlainTextResponse("not found", status_code=404)
-    return RedirectResponse(f"/papers/{matches[0].library_id}/{quote(name)}", status_code=303)
+    return local_redirect(f"/papers/{matches[0].library_id}/{quote(name)}", status_code=303)
 
 
 def _paper_page(request: Request, paper, status_code: int = 200, **extra):
@@ -231,7 +231,7 @@ async def paper_update(library_id: int, name: str, request: Request, display_nam
     repo.update_paper(name, display, enabled is not None, days, library_id)
     repo.log("info", f"Publication {name!r} updated (display name={display!r}, enabled={enabled is not None}, "
                      f"retention override={days})")
-    return RedirectResponse(f"{_paper_url(paper)}?msg=paper", status_code=303)
+    return local_redirect(f"{_paper_url(paper)}?msg=paper", status_code=303)
 
 
 @router.post("/papers/{library_id:int}/{name}/numbering")
@@ -250,7 +250,7 @@ async def paper_numbering(library_id: int, name: str, request: Request, numberin
 
     request_scan(request.app, f"Numbering of {name} changed by {session.username}")
     target = "/unmatched" if back == "unmatched" else _paper_url(paper)
-    return RedirectResponse(f"{target}?msg=numbering", status_code=303)
+    return local_redirect(f"{target}?msg=numbering", status_code=303)
 
 
 # --- issues -------------------------------------------------------------------------------------
@@ -290,32 +290,32 @@ async def issue_action(issue_id: int, action: str, request: Request, session: Se
                 cover.unlink()
         repo.reset_cover(issue.id)
         request.app.state.scan_event.set()
-        return RedirectResponse(f"{back}?msg=cover", status_code=303)
+        return local_redirect(f"{back}?msg=cover", status_code=303)
     if action == "keep":
         repo.set_issue_keep(issue.id, not issue.keep)
         repo.log("info", f"{label}: keep={'off' if issue.keep else 'on'}")
-        return RedirectResponse(f"{back}?msg={'unkept' if issue.keep else 'kept'}", status_code=303)
+        return local_redirect(f"{back}?msg={'unkept' if issue.keep else 'kept'}", status_code=303)
     if action == "remove":
         try:
             if issue.dest_dir and dest_root is not None:
                 remove_issue_dir(Path(issue.dest_dir), dest_root)
         except (UnsafePathError, OSError) as exc:
             repo.log("error", f"Could not remove {label}: {exc}")
-            return RedirectResponse(back, status_code=303)
+            return local_redirect(back, status_code=303)
         repo.set_issue_status(issue.id, "excluded")
         repo.log("info", f"{label} removed from the library by {session.username} (will not be relinked)")
-        return RedirectResponse(f"{back}?msg=removed", status_code=303)
+        return local_redirect(f"{back}?msg=removed", status_code=303)
     if action == "fix":
         from ..app import request_scan
 
         if repo.set_fix_requested([issue.id]):
             request_scan(request.app, f"Library health: fix requested by {session.username}")
-        return RedirectResponse(f"{back}?msg=fixing", status_code=303)
+        return local_redirect(f"{back}?msg=fixing", status_code=303)
     if action == "restore":
         if issue.status in {"excluded", "removed", "error"}:
             repo.set_issue_status(issue.id, "pending")
             request.app.state.scan_event.set()
-        return RedirectResponse(f"{back}?msg=restored", status_code=303)
+        return local_redirect(f"{back}?msg=restored", status_code=303)
     return PlainTextResponse("unknown action", status_code=400)
 
 
@@ -358,7 +358,7 @@ async def deletions_arm(request: Request, confirm: str | None = Form(None),
     if refused := _needs_qbit(settings):
         return refused
     if not settings.retention_enabled or confirm != "yes":
-        return RedirectResponse("/deletions", status_code=303)
+        return local_redirect("/deletions", status_code=303)
     settings.retention_armed = True
     state.store.save(settings)
     log.warning("automatic delete armed by %s", session.username)
@@ -388,7 +388,7 @@ async def deletions_approve(request: Request, session: Session = Depends(require
         return refused
     blocked = state.repo.get_state(BLOCKED_KEY)
     if not blocked:
-        return RedirectResponse("/deletions", status_code=303)
+        return local_redirect("/deletions", status_code=303)
     state.repo.set_state(APPROVAL_KEY, {"torrents": blocked["torrents"], "issues": blocked["issues"],
                                         "expires": time.time() + 3600})
     state.repo.log("warning", f"{session.username} approved a large deletion batch "
@@ -403,7 +403,7 @@ async def deletion_action(deletion_id: int, action: str, request: Request,
     repo = request.app.state.repo
     item = repo.deletion(deletion_id)
     if item is None or item["status"] != "pending":
-        return RedirectResponse("/deletions", status_code=303)
+        return local_redirect("/deletions", status_code=303)
     if action == "keep":
         if item["kind"] == "torrent":
             repo.set_torrent_keep(item["ref"], True)
@@ -452,7 +452,7 @@ async def torrent_delete(torrent_hash: str, request: Request, confirm: str | Non
     if refused := _needs_qbit(settings):
         return refused
     if confirm != "yes":
-        return RedirectResponse(f"/torrents/{quote(torrent_hash)}/delete", status_code=303)
+        return local_redirect(f"/torrents/{quote(torrent_hash)}/delete", status_code=303)
     try:
         await asyncio.to_thread(delete_torrent_now, state.scanner, state.repo, settings, state.qbit_factory,
                                 state.jellyfin_factory, torrent_hash, session.username)
@@ -507,7 +507,7 @@ async def library_health_fix(request: Request, session: Session = Depends(requir
     if count:
         repo.log("info", f"Library health: {session.username} asked to fix {count} issue(s)")
         request_scan(request.app, f"Library health: fix requested by {session.username}")
-    return RedirectResponse(f"/health?msg={'fixing' if count else 'nothing_to_fix'}", status_code=303)
+    return local_redirect(f"/health?msg={'fixing' if count else 'nothing_to_fix'}", status_code=303)
 
 
 # --- other pages --------------------------------------------------------------------------------
@@ -570,7 +570,7 @@ def _log_query(level: str, source: str, search: str) -> tuple[str, bool, str]:
 async def logs_moved(request: Request, session: Session = Depends(require_session)):
     """Logs moved under System; keep the old address working."""
     query = request.url.query
-    return RedirectResponse("/system/logs" + (f"?{query}" if query else ""), status_code=307)
+    return local_redirect("/system/logs" + (f"?{query}" if query else ""), status_code=307)
 
 
 @router.get("/system/logs")
@@ -629,7 +629,7 @@ async def logs_level(request: Request, detail: str = Form("info"), session: Sess
         state.repo.log("info", f"Debug logging turned off by {session.username}")
     keep = {k: v for k, v in request.query_params.items() if k in {"level", "source", "q"} and v}
     query = urlencode({"msg": "loglevel", **keep})
-    return RedirectResponse(f"/system/logs?{query}", status_code=303)
+    return local_redirect(f"/system/logs?{query}", status_code=303)
 
 
 @router.get("/system/logs/file")
@@ -638,13 +638,12 @@ async def logs_file(request: Request, name: str = "", session: Session = Depends
     from .. import logbuffer
 
     directory = logbuffer.log_dir(request.app.state.env.config_dir)
-    known = {entry[0] for entry in logbuffer.log_files(request.app.state.env.config_dir)}
-    if name not in known:
+    # The path comes from listing our own log folder; the request only picks one of those files by name.
+    files = {path.name: path for path in logbuffer.log_paths(request.app.state.env.config_dir)}
+    path = files.get(name)
+    if path is None or not is_within(path, directory) or path.is_symlink() or not path.is_file():
         return PlainTextResponse("not found", status_code=404)
-    path = directory / name
-    if not is_within(path, directory) or path.is_symlink() or not path.is_file():
-        return PlainTextResponse("not found", status_code=404)
-    return FileResponse(path, media_type="text/plain", filename=name)
+    return FileResponse(path, media_type="text/plain", filename=path.name)
 
 
 @router.get("/system/logs/download")
