@@ -6,6 +6,10 @@ All notable changes to Periodica. Versions follow [semantic versioning](https://
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [1.1.2]
+
 ### Security
 - Every page redirect goes through one check that only allows this app's own pages, and the log download
   takes the file from Periodica's own log folder listing (both found by GitHub code scanning; neither was
