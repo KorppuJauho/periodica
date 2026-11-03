@@ -14,8 +14,9 @@ updates:
     schedule:
       interval: weekly
 
+  # Daily: the base image is rebuilt for security fixes (Python, Debian) and the image scan fails until it moves.
   - package-ecosystem: docker
     directory: /
     target-branch: develop
     schedule:
-      interval: weekly
+      interval: daily
