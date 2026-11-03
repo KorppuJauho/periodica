@@ -9,6 +9,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from fastapi import Request
+from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -73,6 +74,14 @@ TEMPLATES.env.filters["datetime"] = _datetime
 TEMPLATES.env.filters["ago"] = _ago
 TEMPLATES.env.filters["size"] = _size
 
+
+def local_redirect(path: str, status_code: int = 303) -> RedirectResponse:
+    """A redirect to a page of this app. Every target is built from a fixed local path; anything that is not
+    one (another site, "//host", "/\\host", a header break) goes to the dashboard instead."""
+    if (not path.startswith("/") or path.startswith(("//", "/\\")) or any(ch in path for ch in "\r\n\\")
+            or urlsplit(path).netloc):
+        path = "/"
+    return RedirectResponse(path, status_code=status_code)
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):

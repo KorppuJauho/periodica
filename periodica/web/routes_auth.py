@@ -6,10 +6,10 @@ import hmac
 import logging
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse
 
 from ..auth import SESSION_COOKIE, AuthError, Session
-from .deps import CsrfFailed, client_ip, render, require_csrf, same_origin
+from .deps import CsrfFailed, client_ip, local_redirect, render, require_csrf, same_origin
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -25,7 +25,7 @@ def _set_session_cookie(request: Request, response, token: str) -> None:
 @router.get("/setup")
 async def setup_page(request: Request):
     if request.app.state.auth.has_users():
-        return RedirectResponse("/login", status_code=303)
+        return local_redirect("/login", status_code=303)
     return render(request, "setup.html")
 
 
@@ -34,7 +34,7 @@ async def setup_submit(request: Request, username: str = Form(...), password: st
                        password2: str = Form(...)):
     auth = request.app.state.auth
     if auth.has_users():
-        return RedirectResponse("/login", status_code=303)
+        return local_redirect("/login", status_code=303)
     if not same_origin(request):
         raise CsrfFailed()
     if password != password2:
@@ -44,7 +44,7 @@ async def setup_submit(request: Request, username: str = Form(...), password: st
     except AuthError as exc:
         return render(request, "setup.html", 400, error=str(exc).capitalize() + ".", username=username)
     request.app.state.repo.log("info", f"Admin user {username.strip()!r} created")
-    response = RedirectResponse("/settings?section=client", status_code=303)
+    response = local_redirect("/settings?section=client", status_code=303)
     _set_session_cookie(request, response, auth.create_session(user_id))
     return response
 
@@ -52,7 +52,7 @@ async def setup_submit(request: Request, username: str = Form(...), password: st
 @router.get("/login")
 async def login_page(request: Request):
     if not request.app.state.auth.has_users():
-        return RedirectResponse("/setup", status_code=303)
+        return local_redirect("/setup", status_code=303)
     return render(request, "login.html")
 
 
@@ -74,7 +74,7 @@ async def login_submit(request: Request, username: str = Form(...), password: st
         request.app.state.repo.log("warning", f"Failed login for {username[:64]!r} from {client_ip(request)}")
         return render(request, "login.html", 401, error="Invalid username or password.", username=username)
     throttle.success(keys)
-    response = RedirectResponse("/", status_code=303)
+    response = local_redirect("/", status_code=303)
     _set_session_cookie(request, response, auth.create_session(user_id))
     return response
 
@@ -82,7 +82,7 @@ async def login_submit(request: Request, username: str = Form(...), password: st
 @router.post("/logout")
 async def logout(request: Request, session: Session = Depends(require_csrf)):
     request.app.state.auth.delete_session(request.cookies.get(SESSION_COOKIE))
-    response = RedirectResponse("/login", status_code=303)
+    response = local_redirect("/login", status_code=303)
     response.delete_cookie(SESSION_COOKIE, path="/")
     return response
 
@@ -91,13 +91,13 @@ async def logout(request: Request, session: Session = Depends(require_csrf)):
 async def change_password(request: Request, current: str = Form(...), new: str = Form(...),
                           new2: str = Form(...), session: Session = Depends(require_csrf)):
     if new != new2:
-        return RedirectResponse("/settings?section=account&pwerr=mismatch", status_code=303)
+        return local_redirect("/settings?section=account&pwerr=mismatch", status_code=303)
     try:
         request.app.state.auth.change_password(session.user_id, current, new, session.token_hash)
     except AuthError:
-        return RedirectResponse("/settings?section=account&pwerr=invalid", status_code=303)
+        return local_redirect("/settings?section=account&pwerr=invalid", status_code=303)
     request.app.state.repo.log("info", f"Password changed for {session.username!r}")
-    return RedirectResponse("/settings?section=account&msg=password", status_code=303)
+    return local_redirect("/settings?section=account&msg=password", status_code=303)
 
 
 @router.post("/api/v1/scan")
