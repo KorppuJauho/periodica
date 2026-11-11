@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # Base image pinned by digest in this one FROM line, which Dependabot keeps updated (it does not read ARG values).
-FROM python:3.14-slim-trixie@sha256:930e1abba7c4e8f96ed93e8012c35d174d7732752731bbd5e8e757d7ec6f3966 AS python
+FROM python:3.15-slim-trixie@sha256:65a65fc7b30b06cb6df4930fd4650697cb23f4c2698ab81fc87e4b031bc36928 AS python
 
 # --- dependencies ---------------------------------------------------------------------------------
 FROM python AS builder
